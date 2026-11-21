@@ -138,6 +138,8 @@
       fontSizePt = 12,
       lineHeight = 1,
       sectionGaps = {},
+      pageNumbers = false,
+      contHeaderText = '',
       richLines = null,
       trailingLines = null,
       bodyAlign = 'both',
@@ -170,6 +172,33 @@
     const annexureRels = annexures.map(a => registerImage(a));
     const hasImages = imageParts.length > 0;
 
+    // Page numbers in the footer from page 2 onwards (page 1 is
+    // counted but carries no number — a "different first page"
+    // setup), plus the optional continuation header on pages 2+.
+    let footerFirstRel = null, footerDefaultRel = null, headerFirstRel = null, headerDefaultRel = null;
+    if (pageNumbers) {
+      footerFirstRel = `rId${relCounter++}`;
+      footerDefaultRel = `rId${relCounter++}`;
+    }
+    if (contHeaderText) {
+      headerFirstRel = `rId${relCounter++}`;
+      headerDefaultRel = `rId${relCounter++}`;
+    }
+    const hfOverrides =
+      (footerFirstRel ? `
+  <Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>
+  <Override PartName="/word/footer2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>` : '') +
+      (headerFirstRel ? `
+  <Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+  <Override PartName="/word/header2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>` : '');
+    const hfRels =
+      (footerFirstRel ? `
+  <Relationship Id="${footerFirstRel}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>
+  <Relationship Id="${footerDefaultRel}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer2.xml"/>` : '') +
+      (headerFirstRel ? `
+  <Relationship Id="${headerFirstRel}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>
+  <Relationship Id="${headerDefaultRel}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header2.xml"/>` : '');
+
     const imageDefaults = hasImages ? `
   <Default Extension="jpg" ContentType="image/jpeg"/>
   <Default Extension="png" ContentType="image/png"/>` : '';
@@ -179,7 +208,7 @@
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>${imageDefaults}
   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>${hfOverrides}
 </Types>`);
 
     zip.addFile('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -191,7 +220,7 @@
   <Relationship Id="${p.relId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${p.fileName}"/>`).join('');
     zip.addFile('word/_rels/document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>${imageRels}
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>${imageRels}${hfRels}
 </Relationships>`);
 
     for (const part of imageParts) {
@@ -469,13 +498,31 @@
       bodyXml += `<w:p><w:pPr><w:jc w:val="center"/></w:pPr>${inlineImageXml(rel, cx, cy)}</w:p>`;
     });
 
+    if (footerFirstRel) {
+      const ftrRpr = '<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="20"/><w:color w:val="64748B"/></w:rPr>';
+      zip.addFile('word/footer1.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p/></w:ftr>`);
+      zip.addFile('word/footer2.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r>${ftrRpr}<w:t>Page </w:t></w:r><w:fldSimple w:instr=" PAGE "><w:r>${ftrRpr}<w:t>2</w:t></w:r></w:fldSimple><w:r>${ftrRpr}<w:t> of </w:t></w:r><w:fldSimple w:instr=" NUMPAGES "><w:r>${ftrRpr}<w:t>2</w:t></w:r></w:fldSimple></w:p></w:ftr>`);
+    }
+    if (headerFirstRel) {
+      zip.addFile('word/header1.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p/></w:hdr>`);
+      zip.addFile('word/header2.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:b/><w:sz w:val="21"/></w:rPr><w:t>${escapeXml(contHeaderText)} — Continued</w:t></w:r></w:p></w:hdr>`);
+    }
+    const sectRefs =
+      (headerFirstRel ? `<w:headerReference w:type="first" r:id="${headerFirstRel}"/><w:headerReference w:type="default" r:id="${headerDefaultRel}"/>` : '') +
+      (footerFirstRel ? `<w:footerReference w:type="first" r:id="${footerFirstRel}"/><w:footerReference w:type="default" r:id="${footerDefaultRel}"/>` : '');
     const docXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
   <w:body>
     ${bodyXml}
     <w:sectPr>
+      ${sectRefs}
       <w:pgSz w:w="11906" w:h="16838"/>
       <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+      ${(footerFirstRel || headerFirstRel) ? '<w:titlePg/>' : ''}
     </w:sectPr>
   </w:body>
 </w:document>`;

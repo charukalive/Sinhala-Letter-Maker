@@ -107,6 +107,7 @@
   const selGapSigs = document.getElementById('selGapSigs');
   const selGapCopies = document.getElementById('selGapCopies');
   const selGapAnnex = document.getElementById('selGapAnnex');
+  const chkContHeader = document.getElementById('chkContHeader');
   const gapSigsEl = document.getElementById('gapSigs');
   const gapCopiesEl = document.getElementById('gapCopies');
   const gapAnnexEl = document.getElementById('gapAnnex');
@@ -1078,21 +1079,28 @@
       const html = `<div class="sheet-block">${letterSignatures.innerHTML}</div>`;
       units.push({ html, h: Math.ceil(measureSheetHtml(html)) + 14, kind: 'block' });
     }
+    // Section lines; a section heading is flagged keepWithNext so
+    // it can never sit alone at the bottom of a page with its list
+    // starting on the next page.
+    const pushSectionLines = (container) => {
+      const kids = Array.from(container.children);
+      kids.forEach((ch, idx) => {
+        const unit = { html: ch.outerHTML, h: Math.ceil(measureSheetHtml(ch.outerHTML)) + 1, kind: 'line' };
+        if (idx === 0 && kids.length > 1 && ch.classList.contains('copies-heading')) unit.keepWithNext = true;
+        units.push(unit);
+      });
+    };
     if (letterCopies.innerHTML.trim()) {
       const g = gapUnitFor(gapBeforeCopies);
       if (g && g.break) units.push(g);
       else units.push({ html: `<div style="height:${g ? 16 + lineH * 2 : 16}px"></div>`, h: g ? 16 + lineH * 2 : 16, kind: 'spacer' });
-      Array.from(letterCopies.children).forEach(ch => {
-        units.push({ html: ch.outerHTML, h: Math.ceil(measureSheetHtml(ch.outerHTML)) + 1, kind: 'line' });
-      });
+      pushSectionLines(letterCopies);
     }
     if (letterAnnexIndex.innerHTML.trim()) {
       const g = gapUnitFor(gapBeforeAnnex);
       if (g && g.break) units.push(g);
       else units.push({ html: `<div style="height:${g ? 16 + lineH * 2 : 16}px"></div>`, h: g ? 16 + lineH * 2 : 16, kind: 'spacer' });
-      Array.from(letterAnnexIndex.children).forEach(ch => {
-        units.push({ html: ch.outerHTML, h: Math.ceil(measureSheetHtml(ch.outerHTML)) + 1, kind: 'line' });
-      });
+      pushSectionLines(letterAnnexIndex);
     }
     addLines(letterTrailing);
 
@@ -1143,6 +1151,15 @@
         i++;
         continue;
       }
+      // Keep-with-next: if this heading fits but its first line
+      // would not, move the heading to the next sheet as well.
+      if (u.keepWithNext && cur.units.length) {
+        const next = queue[i + 1];
+        if (next && !next.break && u.h + next.h > (cur.avail - cur.used)) {
+          newSheet();
+          continue;
+        }
+      }
       const remaining = cur.avail - cur.used;
       if (cur.units.length && u.h > remaining) {
         if (u.kind === 'line' && u.frag && remaining >= lineH) {
@@ -1186,10 +1203,25 @@
     return `top:${topPx}px; font-family:${letterFontFamily()}; font-size:${letterSizePt}pt; line-height:${letterLineHeight}; text-align:${letterAlign === 'both' ? 'justify' : letterAlign};`;
   }
 
+  // Page furniture for sheets after the first: the page number
+  // (mandatory — page 1 is counted but not numbered, numbering
+  // starts at page 2, and annexure pages count too) and, when the
+  // option is ticked, a small continuation header.
+  function sheetFurniture(idx, total) {
+    if (idx === 0) return '';
+    let html = `<div class="sheet-page-num">Page ${idx + 1} of ${total}</div>`;
+    if (chkContHeader && chkContHeader.checked && selLetterhead.value !== 'none') {
+      html += `<div class="sheet-cont-head">${escapeHtml(letterHeadTitle.textContent)} — Continued</div>`;
+    }
+    return html;
+  }
+
   function buildExactPreview() {
     const assetBase = location.href.replace(/[^/]*$/, '');
-    exactPreview.innerHTML = buildSheetData().map(s => `
+    const sheets = buildSheetData();
+    exactPreview.innerHTML = sheets.map((s, idx) => `
       <div class="a4-sheet">
+        ${sheetFurniture(idx, sheets.length)}
         <div class="sheet-content" style="${sheetContentStyle(s.top)}">${s.units.map(u => u.html).join('')}</div>
       </div>`).join('');
   }
@@ -1401,6 +1433,10 @@
       const annexIndexLines = annexIndexText.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
       if (annexIndexLines.length) options.annexIndex = annexIndexLines.map(bulletizeLine);
       options.sectionGaps = { sigs: gapBeforeSigs, copies: gapBeforeCopies, annex: gapBeforeAnnex };
+      options.pageNumbers = true;
+      if (chkContHeader.checked && selLetterhead.value !== 'none') {
+        options.contHeaderText = letterHeadTitle.textContent;
+      }
       if (annexures.length) {
         options.annexures = annexures.map((a, i) => ({
           data: dataUrlToBytes(a.dataUrl),
@@ -1613,9 +1649,11 @@
       const assetBase = location.href.replace(/[^/]*$/, '');
       try {
         const px2mm = (px) => Math.round(px * 0.26458 * 100) / 100;
-        bodyContent = buildSheetData().map(s => `
+        const sheets = buildSheetData();
+        bodyContent = sheets.map((s, idx) => `
           <div class="print-sheet">
             ${s.letterhead ? `<img class="sheet-letterhead" src="${assetBase}assets/awc-letterhead.jpg">` : ''}
+            ${sheetFurniture(idx, sheets.length)}
             <div class="sheet-content" style="top:${px2mm(s.top)}mm; font-family:${letterFontFamily()}; font-size:${letterSizePt}pt; line-height:${letterLineHeight}; text-align:${letterAlign === 'both' ? 'justify' : letterAlign};">${s.units.map(u => u.html).join('')}</div>
           </div>`).join('');
         bodyContent = bodyContent.replace(/src="assets\//g, `src="${assetBase}assets/`);
@@ -1648,6 +1686,8 @@
             .sheet-letterhead { position: absolute; top: 0; left: 0; width: 210mm; height: 297mm; }
             .sheet-content { position: absolute; left: 20mm; right: 20mm; line-height: 1.6; word-break: break-word; }
             .sheet-line { min-height: 1em; }
+            .sheet-page-num { position: absolute; bottom: 10mm; left: 0; right: 0; text-align: center; font-family: Arial, sans-serif; font-size: 10pt; color: #666; }
+            .sheet-cont-head { position: absolute; top: 8mm; left: 20mm; right: 20mm; text-align: center; font-family: Arial, sans-serif; font-size: 10.5pt; font-weight: bold; letter-spacing: 0.03em; color: #333; }
             .sheet-block { margin-top: 3mm; }
             .page-break-marker { page-break-after: always; break-after: page; height: 0; overflow: hidden; visibility: hidden; }
             .print-wrap { position: relative; padding: 18mm 20mm; box-sizing: border-box; }
@@ -1894,6 +1934,11 @@
   selGapSigs.addEventListener('change', () => { gapBeforeSigs = selGapSigs.value; updateLetterEnding(); saveSettings(); });
   selGapCopies.addEventListener('change', () => { gapBeforeCopies = selGapCopies.value; updateLetterEnding(); saveSettings(); });
   selGapAnnex.addEventListener('change', () => { gapBeforeAnnex = selGapAnnex.value; updateLetterEnding(); saveSettings(); });
+
+  chkContHeader.addEventListener('change', () => {
+    saveSettings();
+    if (previewView === 'exact') buildExactPreview();
+  });
 
   // Letter language: Sinhala (converted) or English (as typed)
   selLangMode.addEventListener('change', () => {
