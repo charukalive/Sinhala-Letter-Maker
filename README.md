@@ -31,3 +31,19 @@ A modern, fast, 100% offline-ready Progressive Web App (PWA) designed to format 
   * Sinhala runs are formatted in the selected font (**4u-Bindumathi** / **FM-Malithi** / **IsiAbhaya**).
   * English runs are formatted in **Arial** (completely crisp, clean, and unblurred).
   * When opening the exported **`.docx`** file in Microsoft Word, Word automatically applies the selected font to Sinhala and Arial to English.
+
+---
+
+## Embedded Fonts (Sinhala-Letter-Maker)
+
+The legacy Sinhala fonts are embedded in this app via `@font-face`
+(see `css/style.css`), with the font files in `fonts/`:
+
+- `4u-Bindumathi` (WOFF2 + TTF)
+- `FM-Malithi` (WOFF2 + TTF)
+- `FM-Abhaya` (WOFF2 + TTF)
+- `IsiAbhaya` (WOFF2 + TTF)
+
+The dual-font preview and the A4 letter preview render with these
+embedded fonts on any device, even when the fonts are not installed
+locally. English text remains in Arial.
