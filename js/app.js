@@ -342,10 +342,55 @@
     return window.MixedFontFormatter.convertWithPreservation(text, isIsi ? 'isi' : 'fm', convertFn, fontChoice).richHtml.replace(/\n/g, '<br>');
   }
 
+  // Page breaks live in the editable preview DOM, which is rebuilt
+  // whenever the input text or letter font changes. Remember each
+  // break's line position and restore it after every rebuild, so a
+  // break can never silently vanish before printing.
+  function getPageBreakLineIndices(rootEl) {
+    const indices = [];
+    let line = 0;
+    const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_ELEMENT);
+    let node;
+    while ((node = walker.nextNode())) {
+      if (node.tagName === 'BR') line++;
+      else if (node.classList && node.classList.contains('page-break-marker')) indices.push(line);
+    }
+    return indices;
+  }
+
+  function createPageBreakMarker() {
+    const marker = document.createElement('div');
+    marker.className = 'page-break-marker';
+    marker.contentEditable = 'false';
+    marker.textContent = '⤓ PAGE BREAK — NEXT PAGE STARTS HERE';
+    return marker;
+  }
+
+  function insertPageBreakAtLine(lineIdx) {
+    const marker = createPageBreakMarker();
+    if (lineIdx <= 0) {
+      letterBodyRendered.prepend(marker);
+      marker.after(document.createElement('br'));
+      return;
+    }
+    // Lines are separated by <br>s that may sit inside formatting
+    // spans; index them in document order, exactly as
+    // getPageBreakLineIndices counts them.
+    const refBr = letterBodyRendered.querySelectorAll('br')[lineIdx - 1];
+    if (refBr) {
+      refBr.after(marker);
+      marker.after(document.createElement('br'));
+    } else {
+      letterBodyRendered.appendChild(document.createElement('br'));
+      letterBodyRendered.appendChild(marker);
+    }
+  }
+
   // Update Letter Studio Layout
   function updateLetterStudio() {
     const val = inputText.value || sampleComplaintLetter;
     const fontChoice = selLetterFont.value; // '4u-Bindumathi', 'FM-Malithi', 'FM-Abhaya', 'IsiAbhaya', 'unicode'
+    const breakLines = getPageBreakLineIndices(letterBodyRendered);
 
     const { mainText, trailingText } = splitTrailingSections(val);
     const fam = fontChoice === 'unicode'
@@ -355,6 +400,7 @@
     letterTrailing.style.fontFamily = fam;
     letterBodyRendered.innerHTML = renderTextToHtml(mainText);
     letterTrailing.innerHTML = trailingText.trim() ? renderTextToHtml(trailingText) : '';
+    breakLines.forEach(L => insertPageBreakAtLine(L));
 
     updateEnglishHighlight();
     updateLetterEnding();
@@ -610,15 +656,11 @@
   let sheetMeasurer = null;
 
   function collectLineHtml(el) {
-    const lines = [];
-    let cur = document.createElement('div');
-    const push = () => { lines.push(cur.innerHTML); cur = document.createElement('div'); };
-    Array.from(el.childNodes).forEach(node => {
-      if (node.nodeType === 1 && node.tagName === 'BR') push();
-      else cur.appendChild(node.cloneNode(true));
-    });
-    push();
-    return lines;
+    // Split on every <br> in document order — line breaks often sit
+    // inside the formatter's spans, not at the top level. Fragments
+    // may be unbalanced (a span opened in one line, closed in the
+    // next); the HTML parser balances them when measured/rendered.
+    return el.innerHTML.split(/<br\s*\/?>/i);
   }
 
   function measureSheetHtml(html) {
