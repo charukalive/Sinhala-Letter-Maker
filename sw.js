@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sinhala-font-studio-v24-pagenums';
+const CACHE_NAME = 'sinhala-font-studio-v25-formatting';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

@@ -465,16 +465,40 @@
   // A line that starts with * is a point — render the * as a
   // bullet ● (in the English font, like Hugo's other symbols). The
   // source text keeps the *; only the rendering changes.
-  const bulletizeLine = (line) => line.replace(/^(\s*)\*[ \t]*/, '$1● ');
+  const bulletizeLine = (line) => line.replace(/^(\s*)\*(?=[ \t]|$)[ \t]*/, '$1● ');
 
-  function renderTextToHtml(text) {
-    text = (text || '').split('\n').map(bulletizeLine).join('\n');
-    if (letterLang === 'en') return escapeHtml(text).replace(/\n/g, '<br>');
+  // Convert one raw text run (no newlines) to letter HTML.
+  function convertRawText(s) {
+    if (letterLang === 'en') return escapeHtml(s);
     const fontChoice = selLetterFont.value;
-    if (fontChoice === 'unicode') return escapeHtml(text).replace(/\n/g, '<br>');
+    if (fontChoice === 'unicode') return escapeHtml(s);
     const isIsi = (fontChoice === 'IsiAbhaya');
     const convertFn = isIsi ? unicodeToIsi : unicodeToFM;
-    return window.MixedFontFormatter.convertWithPreservation(text, isIsi ? 'isi' : 'fm', convertFn, fontChoice).richHtml.replace(/\n/g, '<br>');
+    return window.MixedFontFormatter.convertWithPreservation(s, isIsi ? 'isi' : 'fm', convertFn, fontChoice).richHtml;
+  }
+
+  // One letter line: Hugo's inline markup is applied here —
+  // *text* becomes bold (asterisks hidden) and "text" becomes bold
+  // (quotes still shown), so crucial content stands out in print.
+  function renderLineHtml(line) {
+    const parts = [];
+    const re = /"([^"\n]+)"|\*([^*\n]+)\*/g;
+    let last = 0, m;
+    while ((m = re.exec(line)) !== null) {
+      if (m.index > last) parts.push({ bold: false, s: line.slice(last, m.index) });
+      parts.push({ bold: true, s: m[2] !== undefined ? m[2] : m[0] });
+      last = m.index + m[0].length;
+    }
+    if (last < line.length) parts.push({ bold: false, s: line.slice(last) });
+    if (!parts.length) parts.push({ bold: false, s: '' });
+    return parts.map(p => {
+      const html = convertRawText(p.s);
+      return p.bold ? `<b>${html}</b>` : html;
+    }).join('');
+  }
+
+  function renderTextToHtml(text) {
+    return (text || '').split('\n').map(l => renderLineHtml(bulletizeLine(l))).join('<br>');
   }
 
   // Page breaks live in the editable preview DOM, which is rebuilt
@@ -547,11 +571,80 @@
     }
   }
 
+  // Formatting survival: the letter body is rebuilt from the input
+  // text on every edit, which used to wipe bold/italic/underline/
+  // colour Hugo applied in the preview. Capture each formatted
+  // line's segments before the rebuild and re-apply them afterwards
+  // to lines whose text is unchanged (matched in order).
+  function fragmentSegments(fragHtml) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = fragHtml;
+    const segs = [];
+    const walk = (node, flags) => {
+      node.childNodes.forEach(ch => {
+        if (ch.nodeType === 3) {
+          if (ch.nodeValue) {
+            const seg = { text: ch.nodeValue, bold: !!flags.bold, italic: !!flags.italic, underline: !!flags.underline, latin: !!flags.latin };
+            if (flags.color) seg.color = flags.color;
+            segs.push(seg);
+          }
+        } else if (ch.nodeType === 1) {
+          const f = { ...flags };
+          const tag = ch.tagName;
+          if (tag === 'B' || tag === 'STRONG') f.bold = true;
+          if (tag === 'I' || tag === 'EM') f.italic = true;
+          if (tag === 'U') f.underline = true;
+          const col = elementColor(ch);
+          if (col) f.color = col;
+          if (ch.classList && ch.classList.contains('en-text')) f.latin = true;
+          if (ch.classList && ch.classList.contains('si-text')) f.latin = false;
+          walk(ch, f);
+        }
+      });
+    };
+    walk(tmp, {});
+    return segs;
+  }
+  function captureLineFormats() {
+    const out = [];
+    collectLineHtml(letterBodyRendered).forEach(frag => {
+      if (frag.includes('page-break-marker')) return;
+      const text = frag.replace(/<[^>]+>/g, '');
+      if (!text) return;
+      const segs = fragmentSegments(frag);
+      if (segs.some(s => s.bold || s.italic || s.underline || s.color)) out.push({ text, segs });
+    });
+    return out;
+  }
+  function segToHtml(s) {
+    let h = escapeHtml(s.text);
+    if (s.color) h = `<span style="color:${s.color}">${h}</span>`;
+    if (s.underline) h = `<u>${h}</u>`;
+    if (s.italic) h = `<i>${h}</i>`;
+    if (s.bold) h = `<b>${h}</b>`;
+    return `<span class="${s.latin ? 'en-text' : 'si-text'}">${h}</span>`;
+  }
+  function restoreLineFormats(saved) {
+    if (!saved || !saved.length) return;
+    let p = 0;
+    const frags = collectLineHtml(letterBodyRendered).map(frag => {
+      if (p >= saved.length || frag.includes('page-break-marker')) return frag;
+      const text = frag.replace(/<[^>]+>/g, '');
+      if (text && text === saved[p].text) {
+        const entry = saved[p++];
+        return entry.segs.map(segToHtml).join('');
+      }
+      return frag;
+    });
+    if (p > 0) letterBodyRendered.innerHTML = frags.join('<br>');
+  }
+
   // Update Letter Studio Layout
   function updateLetterStudio() {
     const val = inputText.value || sampleComplaintLetter;
     const fontChoice = selLetterFont.value; // '4u-Bindumathi', 'FM-Malithi', 'FM-Abhaya', 'IsiAbhaya', 'unicode'
     const breakAnchors = getPageBreakAnchors(letterBodyRendered);
+    const savedFormats = captureLineFormats();
 
     const { mainText, trailingText } = splitTrailingSections(val);
     // Spacing comes only from the source text itself: a blank line
@@ -569,6 +662,7 @@
     letterBodyRendered.innerHTML = renderTextToHtml(mainText);
     letterTrailing.innerHTML = trailingText.trim() ? renderTextToHtml(trailingText) : '';
     breakAnchors.forEach(a => restorePageBreak(a));
+    restoreLineFormats(savedFormats);
 
     updateEnglishHighlight();
     updateLetterEnding();
@@ -947,6 +1041,19 @@
     if (previewView === 'exact') buildExactPreview();
   }
 
+  // The text colour set on an element, if any (FONT color attribute
+  // or inline style), normalised to #rrggbb where possible.
+  function elementColor(el) {
+    if (!el || el.nodeType !== 1) return '';
+    let c = '';
+    if (el.getAttribute && el.getAttribute('color')) c = el.getAttribute('color');
+    else if (el.style && el.style.color) c = el.style.color;
+    if (!c) return '';
+    const m = String(c).match(/rgb\(\s*(\d+),\s*(\d+),\s*(\d+)\s*\)/);
+    if (m) return '#' + [m[1], m[2], m[3]].map(v => (+v).toString(16).padStart(2, '0')).join('');
+    return String(c);
+  }
+
   // Extract the (possibly formatted) letter body as lines of segments
   // for the DOCX builder. Preview spans already hold legacy-font text;
   // any raw Unicode Sinhala (e.g. pasted in) is converted here.
@@ -968,7 +1075,9 @@
           // Bullet / symbol-only segments (* • ● ▪ etc.) always use
           // the English font, never the legacy Sinhala font.
           const segLatin = !!flags.latin || (!/[\u0D80-\u0DFF]/.test(text) && /[*•▪●○■◆◇►▸]/.test(text));
-          cur.push({ text, bold: !!flags.bold, italic: !!flags.italic, underline: !!flags.underline, latin: segLatin });
+          const seg = { text, bold: !!flags.bold, italic: !!flags.italic, underline: !!flags.underline, latin: segLatin };
+          if (flags.color) seg.color = flags.color;
+          cur.push(seg);
         } else if (ch.nodeType === 1) {
           const tag = ch.tagName;
           if (tag === 'BR') { flush(); return; }
@@ -983,6 +1092,8 @@
           if (tag === 'B' || tag === 'STRONG') f.bold = true;
           if (tag === 'I' || tag === 'EM') f.italic = true;
           if (tag === 'U') f.underline = true;
+          const col = elementColor(ch);
+          if (col) f.color = col;
           if (ch.classList && ch.classList.contains('en-text')) f.latin = true;
           if (ch.classList && ch.classList.contains('si-text')) f.latin = false;
           const isBlock = (tag === 'DIV' || tag === 'P') && !isRoot;
@@ -1911,6 +2022,24 @@
   document.querySelectorAll('#formatToolbar [data-fmt]').forEach(btn => {
     btn.addEventListener('mousedown', (e) => e.preventDefault());
     btn.addEventListener('click', () => applyInlineFormat(btn.dataset.fmt));
+  });
+  // Text colour swatches: apply to the selected letter text, like
+  // Word's font colour. The colour is part of the line's formatting,
+  // so it survives edits and flows into Print/PDF and the DOCX.
+  document.querySelectorAll('#formatToolbar [data-color]').forEach(btn => {
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', () => {
+      const r = letterRange();
+      const saved = r ? r.cloneRange() : null;
+      letterBodyRendered.focus();
+      if (saved) {
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(saved);
+      }
+      document.execCommand('foreColor', false, btn.dataset.color);
+      if (previewView === 'exact') buildExactPreview();
+    });
   });
   document.querySelectorAll('#formatToolbar [data-align]').forEach(btn => {
     btn.addEventListener('click', () => setLetterAlign(btn.dataset.align === 'justify' ? 'both' : btn.dataset.align));

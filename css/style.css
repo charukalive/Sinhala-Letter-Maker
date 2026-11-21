@@ -1025,6 +1025,14 @@ textarea.editor-input::placeholder {
   background-position: bottom left;
 }
 
+.color-btn {
+  width: 22px !important;
+  height: 22px;
+  border-radius: 50%;
+  padding: 0 !important;
+  border: 2px solid rgba(255, 255, 255, 0.65) !important;
+}
+
 /* Gap indicators between the ending sections (edit view) */
 .section-gap {
   display: none;

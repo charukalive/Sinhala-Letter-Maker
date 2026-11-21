@@ -359,7 +359,7 @@
         for (const s of segs) {
           if (!s.text) continue;
           const font = s.latin ? 'Arial' : targetFont;
-          const fmt = `${s.bold ? '<w:b/>' : ''}${s.italic ? '<w:i/>' : ''}${s.underline ? '<w:u w:val="single"/>' : ''}`;
+          const fmt = `${s.bold ? '<w:b/>' : ''}${s.italic ? '<w:i/>' : ''}${s.underline ? '<w:u w:val="single"/>' : ''}${s.color ? `<w:color w:val="${escapeXml(String(s.color).replace('#', '').toUpperCase())}"/>` : ''}`;
           out += `<w:r><w:rPr><w:rFonts w:ascii="${escapeXml(font)}" w:hAnsi="${escapeXml(font)}" w:cs="${escapeXml(font)}"/>${fmt}<w:sz w:val="${szVal}"/><w:szCs w:val="${szVal}"/></w:rPr><w:t xml:space="preserve">${escapeXml(s.text)}</w:t></w:r>`;
         }
         out += '</w:p>';
