@@ -1032,7 +1032,6 @@ textarea.editor-input::placeholder {
   word-break: break-word;
   text-align: justify;
   text-justify: inter-word;
-  line-height: 1.6;
 }
 
 /* Exact paginated preview */
@@ -1068,13 +1067,12 @@ textarea.editor-input::placeholder {
   right: 76px;
   text-align: justify;
   text-justify: inter-word;
-  line-height: 1.6;
+  line-height: 1.15;
   word-break: break-word;
 }
 
 .sheet-line {
-  line-height: 1.6;
-  min-height: 1.6em;
+  min-height: 1em;
 }
 
 .sheet-block {

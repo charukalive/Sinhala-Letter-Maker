@@ -136,6 +136,7 @@
       footerContact = '',
       convertSinhalaFn = null,
       fontSizePt = 12,
+      lineHeight = 1,
       richLines = null,
       trailingLines = null,
       bodyAlign = 'both',
@@ -147,6 +148,7 @@
     } = options;
 
     const szVal = Math.round((fontSizePt || 12) * 2); // 12pt = 24 half-points
+    const lineVal = Math.round(240 * (lineHeight || 1)); // Word line units: 240 = single
 
     const zip = new SimpleZip();
 
@@ -208,7 +210,7 @@
     <w:pPrDefault>
       <w:pPr>
         <w:jc w:val="both"/>
-        <w:spacing w:line="240" w:lineRule="auto" w:before="0" w:after="0"/>
+        <w:spacing w:line="${lineVal}" w:lineRule="auto" w:before="0" w:after="0"/>
       </w:pPr>
     </w:pPrDefault>
   </w:docDefaults>
@@ -217,7 +219,7 @@
     <w:qFormat/>
     <w:pPr>
       <w:jc w:val="both"/>
-      <w:spacing w:line="240" w:lineRule="auto" w:before="0" w:after="0"/>
+      <w:spacing w:line="${lineVal}" w:lineRule="auto" w:before="0" w:after="0"/>
     </w:pPr>
     <w:rPr>
       <w:rFonts w:ascii="${escapeXml(targetFont)}" w:hAnsi="${escapeXml(targetFont)}" w:cs="${escapeXml(targetFont)}"/>
@@ -320,10 +322,10 @@
           continue;
         }
         if (!segs || !segs.length || !segs.some(s => (s.text || '').length)) {
-          out += `<w:p><w:pPr><w:jc w:val="${jc}"/><w:spacing w:line="240" w:lineRule="auto" w:before="0" w:after="0"/></w:pPr></w:p>`;
+          out += `<w:p><w:pPr><w:jc w:val="${jc}"/><w:spacing w:line="${lineVal}" w:lineRule="auto" w:before="0" w:after="0"/></w:pPr></w:p>`;
           continue;
         }
-        out += `<w:p><w:pPr><w:jc w:val="${jc}"/><w:spacing w:line="240" w:lineRule="auto" w:before="0" w:after="0"/></w:pPr>`;
+        out += `<w:p><w:pPr><w:jc w:val="${jc}"/><w:spacing w:line="${lineVal}" w:lineRule="auto" w:before="0" w:after="0"/></w:pPr>`;
         for (const s of segs) {
           if (!s.text) continue;
           const font = s.latin ? 'Arial' : targetFont;
@@ -342,11 +344,11 @@
     for (const line of lines) {
       // Space after paragraph removed: w:before="0" w:after="0", Justified: w:jc w:val="both"
       if (!line.trim()) {
-        bodyXml += '<w:p><w:pPr><w:jc w:val="both"/><w:spacing w:line="240" w:lineRule="auto" w:before="0" w:after="0"/></w:pPr></w:p>';
+        bodyXml += `<w:p><w:pPr><w:jc w:val="both"/><w:spacing w:line="${lineVal}" w:lineRule="auto" w:before="0" w:after="0"/></w:pPr></w:p>`;
         continue;
       }
 
-      bodyXml += '<w:p><w:pPr><w:jc w:val="both"/><w:spacing w:line="240" w:lineRule="auto" w:before="0" w:after="0"/></w:pPr>';
+      bodyXml += `<w:p><w:pPr><w:jc w:val="both"/><w:spacing w:line="${lineVal}" w:lineRule="auto" w:before="0" w:after="0"/></w:pPr>`;
 
       if (preserveEnglish) {
         let lastIdx = 0;

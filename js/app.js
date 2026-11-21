@@ -94,6 +94,7 @@
 
   // Letter formatting state (Letter Studio)
   const selLetterSize = document.getElementById('selLetterSize');
+  const selLineSpacing = document.getElementById('selLineSpacing');
   const btnCopyLetter = document.getElementById('btnCopyLetter');
   const newSigNameSi = document.getElementById('newSigNameSi');
   const newSigNameEn = document.getElementById('newSigNameEn');
@@ -101,6 +102,7 @@
   const btnAddSig = document.getElementById('btnAddSig');
   let letterAlign = 'both'; // 'both' | 'left' | 'center' | 'right'
   let letterSizePt = 12;
+  let letterLineHeight = 1.15;
 
   // Custom signatures are stored on this device only (localStorage)
   function loadCustomSignatures() {
@@ -786,12 +788,13 @@
     sheetMeasurer.style.width = (SHEET.w - SHEET.padX * 2) + 'px';
     sheetMeasurer.style.fontFamily = letterFontFamily();
     sheetMeasurer.style.fontSize = letterSizePt + 'pt';
+    sheetMeasurer.style.lineHeight = letterLineHeight;
     sheetMeasurer.innerHTML = html;
     return sheetMeasurer.offsetHeight;
   }
 
   function buildSheetData() {
-    const lineH = Math.ceil(letterSizePt * (96 / 72) * 1.6);
+    const lineH = Math.ceil(letterSizePt * (96 / 72) * letterLineHeight);
     const units = [];
     const addLines = (el) => {
       if (!el || !el.innerHTML.trim()) return;
@@ -910,7 +913,7 @@
   }
 
   function sheetContentStyle(topPx) {
-    return `top:${topPx}px; font-family:${letterFontFamily()}; font-size:${letterSizePt}pt; text-align:${letterAlign === 'both' ? 'justify' : letterAlign};`;
+    return `top:${topPx}px; font-family:${letterFontFamily()}; font-size:${letterSizePt}pt; line-height:${letterLineHeight}; text-align:${letterAlign === 'both' ? 'justify' : letterAlign};`;
   }
 
   function buildExactPreview() {
@@ -1077,7 +1080,8 @@
       targetFont,
       preserveEnglish: chkPreserveEnglish.checked,
       convertSinhalaFn: convertFn,
-      fontSizePt: includeLetterhead ? letterSizePt : 12
+      fontSizePt: includeLetterhead ? letterSizePt : 12,
+      lineHeight: includeLetterhead ? letterLineHeight : 1
     };
 
     // Letter Studio: export the formatted body (bold/underline/etc.)
@@ -1324,7 +1328,7 @@
         bodyContent = buildSheetData().map(s => `
           <div class="print-sheet">
             ${s.letterhead ? `<img class="sheet-letterhead" src="${assetBase}assets/awc-letterhead.jpg">` : ''}
-            <div class="sheet-content" style="top:${px2mm(s.top)}mm; font-family:${letterFontFamily()}; font-size:${letterSizePt}pt; text-align:${letterAlign === 'both' ? 'justify' : letterAlign};">${s.units.map(u => u.html).join('')}</div>
+            <div class="sheet-content" style="top:${px2mm(s.top)}mm; font-family:${letterFontFamily()}; font-size:${letterSizePt}pt; line-height:${letterLineHeight}; text-align:${letterAlign === 'both' ? 'justify' : letterAlign};">${s.units.map(u => u.html).join('')}</div>
           </div>`).join('');
         bodyContent = bodyContent.replace(/src="assets\//g, `src="${assetBase}assets/`);
         usedSheets = true;
@@ -1355,7 +1359,7 @@
             .print-sheet:last-child { page-break-after: auto; break-after: auto; }
             .sheet-letterhead { position: absolute; top: 0; left: 0; width: 210mm; height: 297mm; }
             .sheet-content { position: absolute; left: 20mm; right: 20mm; line-height: 1.6; word-break: break-word; }
-            .sheet-line { line-height: 1.6; min-height: 1.6em; }
+            .sheet-line { min-height: 1em; }
             .sheet-block { margin-top: 3mm; }
             .page-break-marker { page-break-after: always; break-after: page; height: 0; overflow: hidden; visibility: hidden; }
             .print-wrap { position: relative; padding: 18mm 20mm; box-sizing: border-box; }
@@ -1366,7 +1370,7 @@
             .letter-header-banner { text-align: center; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 25px; }
             .letter-logo-title { font-family: Arial, sans-serif; font-size: 16pt; font-weight: bold; }
             .letter-logo-subtitle { font-family: Arial, sans-serif; font-size: 9pt; color: #555; }
-            .letter-body-content { font-size: ${isLetterStudio ? letterSizePt : 12}pt; line-height: 1.6; font-family: '${fontName}', sans-serif; text-align: justify; text-justify: inter-word; }
+            .letter-body-content { font-size: ${isLetterStudio ? letterSizePt : 12}pt; line-height: ${isLetterStudio ? letterLineHeight : 1.6}; font-family: '${fontName}', sans-serif; text-align: justify; text-justify: inter-word; }
             .letter-footer-banner { border-top: 2px solid #999; margin-top: 40px; padding-top: 10px; font-family: Arial, sans-serif; font-size: 9pt; display: flex; justify-content: space-between; }
             .letter-signatures { margin-top: 10mm; }
             .sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm 14mm; }
@@ -1588,6 +1592,14 @@
     letterTrailing.style.fontSize = letterSizePt + 'pt';
     if (previewView === 'exact') buildExactPreview();
   });
+  selLineSpacing.addEventListener('change', () => {
+    letterLineHeight = parseFloat(selLineSpacing.value) || 1.15;
+    letterBodyRendered.style.lineHeight = letterLineHeight;
+    letterTrailing.style.lineHeight = letterLineHeight;
+    if (previewView === 'exact') buildExactPreview();
+  });
+  letterBodyRendered.style.lineHeight = letterLineHeight;
+  letterTrailing.style.lineHeight = letterLineHeight;
   btnCopyLetter.addEventListener('click', copyLetterFormatted);
 
   // Paste: allow formatted paste into the letter, then strip foreign

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sinhala-font-studio-v19-origspaces';
+const CACHE_NAME = 'sinhala-font-studio-v20-linespacing';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
