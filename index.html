@@ -228,6 +228,13 @@
               <option value="unicode">Modern Unicode (Iskoola Potha)</option>
             </select>
           </div>
+          <div class="control-item">
+            <label for="selLangMode">Letter language:</label>
+            <select id="selLangMode" class="control-select">
+              <option value="si" selected>Sinhala (converted)</option>
+              <option value="en">English (as typed)</option>
+            </select>
+          </div>
         </div>
 
         <div class="panel-actions">
@@ -237,9 +244,32 @@
           <button class="btn-tool btn-accent" id="btnLetterDocx">
             📥 Download .DOCX
           </button>
+          <button class="btn-tool" id="btnShareDocx">
+            📤 Share .DOCX
+          </button>
           <button class="btn-tool" id="btnLetterDoc">
             .DOC
           </button>
+        </div>
+      </div>
+
+      <!-- Templates / draft / backup bar -->
+      <div class="letter-ending-panel" style="margin-top: 0.5rem;">
+        <div class="ending-group">
+          <div class="ending-title">🗂️ Templates &amp; draft — your letter is auto-saved on this device as you type</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center;">
+            <button class="btn-tool" id="btnPresetSi" type="button">AWC — Sinhala setup</button>
+            <button class="btn-tool" id="btnPresetEn" type="button">AWC — English setup</button>
+            <select id="selTemplate" class="control-select" style="max-width: 200px;"></select>
+            <button class="btn-tool" id="btnApplyTemplate" type="button">Apply template</button>
+            <button class="btn-tool" id="btnSaveTemplate" type="button">💾 Save current as template</button>
+            <button class="btn-tool" id="btnDeleteTemplate" type="button">🗑 Delete</button>
+            <button class="btn-tool" id="btnNewLetter" type="button">🧹 New blank letter</button>
+            <button class="btn-tool" id="btnBackup" type="button">⬇ Backup</button>
+            <button class="btn-tool" id="btnRestore" type="button">⬆ Restore</button>
+            <input type="file" id="restoreFile" accept="application/json" style="display: none;">
+          </div>
+          <div class="add-sig-note">Templates save the letter text and setup (letterhead, language, signatures, copies) — annexure files are not included. Backup downloads everything (draft, templates, settings, your signatures) as one file.</div>
         </div>
       </div>
 
@@ -494,7 +524,7 @@
   <!-- Footer -->
   <footer class="app-footer">
     <div>Sinhala Font & Letter Studio • 4u-Bindumathi • FM-Malithi • FM-Abhaya • IsiAbhaya • 100% Mobile Ready</div>
-    <div style="margin-top: 0.25rem; opacity: 0.75;">Build v22 — if this number is lower than the latest I sent you, close the app fully and reopen it</div>
+    <div style="margin-top: 0.25rem; opacity: 0.75;">Build v23 — if this number is lower than the latest I sent you, close the app fully and reopen it</div>
   </footer>
 
   <!-- Scripts -->

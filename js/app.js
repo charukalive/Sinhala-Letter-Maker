@@ -40,6 +40,10 @@
 
   const selLetterhead = document.getElementById('selLetterhead');
   const selLetterFont = document.getElementById('selLetterFont');
+  const selLangMode = document.getElementById('selLangMode');
+  const btnShareDocx = document.getElementById('btnShareDocx');
+  const selTemplate = document.getElementById('selTemplate');
+  const restoreFile = document.getElementById('restoreFile');
   const letterBodyRendered = document.getElementById('letterBodyRendered');
   const letterHeaderBanner = document.getElementById('letterHeaderBanner');
   const letterFooterBanner = document.getElementById('letterFooterBanner');
@@ -80,12 +84,17 @@
   // (16th October 2026 Letter to Min of Environment .docx), in the
   // letter's 2-column grid order. Org line is the same for all.
   const AWC_ORG_LINE = 'සත්ව සුබසාධන සංසදය';
+  const AWC_ORG_EN = 'Animal Welfare Coalition (AWC)';
+  // Letter language: 'si' = Sinhala, converted into the legacy font;
+  // 'en' = English, kept exactly as typed in a normal English font,
+  // with English signatory names and section headings.
+  let letterLang = 'si';
   let SIGNATORIES = [
     { id: 'gihan', nameSi: 'ගිහාන් දිනුෂ්ක', nameEn: 'Gihan Dinushka', img: 'assets/signatures/gihan-dinushka.jpg', w: 389, h: 194 },
-    { id: 'chamith', nameSi: 'වෛද්‍ය චමිත් නානායක්කාර', nameEn: 'Dr Chamith Nanayakkara', img: 'assets/signatures/chamith-nanayakkara.jpg', w: 246, h: 204 },
+    { id: 'chamith', nameSi: 'වෛද්‍ය චමිත් නානායක්කාර', nameEn: 'Dr. Chamith Nanayakkara', img: 'assets/signatures/chamith-nanayakkara.jpg', w: 246, h: 204 },
     { id: 'thilini', nameSi: 'තිලිනි ගමගේ', nameEn: 'Thilini Gamage', img: 'assets/signatures/thilini-gamage.jpg', w: 602, h: 261 },
     { id: 'charuka', nameSi: 'චාරුක වික්‍රමසේකර', nameEn: 'Charuka Wickramasekara', img: 'assets/signatures/charuka-wickramasekara.png', w: 214, h: 91 },
-    { id: 'mihiri', nameSi: 'මිහිරි සිරිවර්ධන', nameEn: 'Mihiri Siriwardena', img: 'assets/signatures/mihiri-siriwardena.png', w: 176, h: 55 },
+    { id: 'mihiri', nameSi: 'මිහිරි සිරිවර්ධන', nameEn: 'Mihiri Siriwardhana', img: 'assets/signatures/mihiri-siriwardena.png', w: 176, h: 55 },
     { id: 'aravinda', nameSi: 'අරවින්ද ප්‍රනාන්දු', nameEn: 'Aravinda Fernando', img: 'assets/signatures/aravinda-fernando.jpg', w: 489, h: 173 }
   ];
 
@@ -126,6 +135,114 @@
     try {
       localStorage.setItem('awc_custom_signatures', JSON.stringify(SIGNATORIES.filter(s => s.custom)));
     } catch (e) { /* storage full/blocked: signature still works this session */ }
+  }
+
+  // ---- Draft auto-save + remembered settings + templates ----
+  // Everything lives on this device only (localStorage), like the
+  // custom signatures. The draft (letter text, copies, annexure
+  // list) is saved as Hugo types, so closing the app or the phone
+  // restarting never loses the letter.
+  const LS_DRAFT = 'slm_draft_v1';
+  const LS_DRAFT_ANNEX = 'slm_draft_annex_v1';
+  const LS_SETTINGS = 'slm_settings_v1';
+  const LS_TEMPLATES = 'slm_templates_v1';
+  let draftSaveTimer = null;
+  function saveDraft() {
+    clearTimeout(draftSaveTimer);
+    draftSaveTimer = setTimeout(() => {
+      try {
+        localStorage.setItem(LS_DRAFT, JSON.stringify({
+          text: inputText.value, copies: copiesText.value, annexIndex: annexIndexText.value
+        }));
+      } catch (e) { /* storage unavailable */ }
+      try {
+        localStorage.setItem(LS_DRAFT_ANNEX, JSON.stringify(annexures));
+      } catch (e) { /* annexure images can exceed the quota — the letter text is still saved */ }
+    }, 300);
+  }
+  function currentSettings() {
+    const sigTicks = {};
+    SIGNATORIES.forEach(s => {
+      const cb = document.getElementById('sigChk-' + s.id);
+      if (cb) sigTicks[s.id] = cb.checked;
+    });
+    return {
+      letterFont: selLetterFont.value, letterhead: selLetterhead.value, lang: letterLang,
+      size: letterSizePt, spacing: letterLineHeight, align: letterAlign,
+      gaps: { sigs: gapBeforeSigs, copies: gapBeforeCopies, annex: gapBeforeAnnex },
+      sigTicks,
+      contHeader: !!(document.getElementById('chkContHeader') || {}).checked
+    };
+  }
+  function saveSettings() {
+    try { localStorage.setItem(LS_SETTINGS, JSON.stringify(currentSettings())); } catch (e) { /* ignore */ }
+  }
+  function applySettings(st) {
+    if (!st) return;
+    if (st.letterFont) { selLetterFont.value = st.letterFont; fontSelect.value = st.letterFont; }
+    if (st.letterhead) selLetterhead.value = st.letterhead;
+    if (st.lang) { letterLang = st.lang; selLangMode.value = st.lang; }
+    if (st.size) { letterSizePt = st.size; selLetterSize.value = String(st.size); }
+    if (st.spacing) { letterLineHeight = st.spacing; selLineSpacing.value = String(st.spacing); }
+    if (st.align) letterAlign = st.align;
+    if (st.gaps) {
+      gapBeforeSigs = st.gaps.sigs || 'none'; selGapSigs.value = gapBeforeSigs;
+      gapBeforeCopies = st.gaps.copies || 'none'; selGapCopies.value = gapBeforeCopies;
+      gapBeforeAnnex = st.gaps.annex || 'none'; selGapAnnex.value = gapBeforeAnnex;
+    }
+    if (st.sigTicks) {
+      SIGNATORIES.forEach(s => {
+        const cb = document.getElementById('sigChk-' + s.id);
+        if (cb && s.id in st.sigTicks) cb.checked = !!st.sigTicks[s.id];
+      });
+    }
+    const cont = document.getElementById('chkContHeader');
+    if (cont && typeof st.contHeader === 'boolean') cont.checked = st.contHeader;
+    letterBodyRendered.style.fontSize = letterSizePt + 'pt';
+    letterTrailing.style.fontSize = letterSizePt + 'pt';
+    letterBodyRendered.style.lineHeight = letterLineHeight;
+    letterTrailing.style.lineHeight = letterLineHeight;
+  }
+  function restoreSavedState() {
+    let settings = null, draft = null;
+    try { settings = JSON.parse(localStorage.getItem(LS_SETTINGS) || 'null'); } catch (e) { /* ignore */ }
+    try { draft = JSON.parse(localStorage.getItem(LS_DRAFT) || 'null'); } catch (e) { /* ignore */ }
+    applySettings(settings);
+    if (draft) {
+      if (typeof draft.text === 'string') inputText.value = draft.text;
+      if (typeof draft.copies === 'string') copiesText.value = draft.copies;
+      if (typeof draft.annexIndex === 'string') annexIndexText.value = draft.annexIndex;
+      try {
+        const ann = JSON.parse(localStorage.getItem(LS_DRAFT_ANNEX) || '[]');
+        if (Array.isArray(ann)) annexures = ann;
+      } catch (e) { /* ignore */ }
+      renderAnnexList();
+    }
+    return !!draft;
+  }
+  function loadTemplates() {
+    try { return JSON.parse(localStorage.getItem(LS_TEMPLATES) || '{}') || {}; } catch (e) { return {}; }
+  }
+  function saveTemplates(t) {
+    try { localStorage.setItem(LS_TEMPLATES, JSON.stringify(t)); } catch (e) { /* ignore */ }
+  }
+  function refreshTemplateList() {
+    const t = loadTemplates();
+    const names = Object.keys(t);
+    selTemplate.innerHTML = names.length
+      ? names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')
+      : '<option value="">No saved templates</option>';
+  }
+  function applyTemplateState(state) {
+    if (!state) return;
+    if (typeof state.text === 'string') inputText.value = state.text;
+    if (typeof state.copies === 'string') copiesText.value = state.copies;
+    if (typeof state.annexIndex === 'string') annexIndexText.value = state.annexIndex;
+    applySettings(state.settings);
+    updateLetterheadDesign();
+    updateLetterStudio();
+    saveSettings();
+    saveDraft();
   }
 
   // Theme & Modal
@@ -351,6 +468,7 @@
 
   function renderTextToHtml(text) {
     text = (text || '').split('\n').map(bulletizeLine).join('\n');
+    if (letterLang === 'en') return escapeHtml(text).replace(/\n/g, '<br>');
     const fontChoice = selLetterFont.value;
     if (fontChoice === 'unicode') return escapeHtml(text).replace(/\n/g, '<br>');
     const isIsi = (fontChoice === 'IsiAbhaya');
@@ -440,9 +558,11 @@
     // no paragraph spacing of its own (before/after are zero in the
     // preview, the sheets and the DOCX, like Word with paragraph
     // spacing removed).
-    const fam = fontChoice === 'unicode'
-      ? "'Iskoola Potha', 'Noto Sans Sinhala', sans-serif"
-      : `'${fontChoice}', sans-serif`;
+    const fam = letterLang === 'en'
+      ? 'Arial, Helvetica, sans-serif'
+      : fontChoice === 'unicode'
+        ? "'Iskoola Potha', 'Noto Sans Sinhala', sans-serif"
+        : `'${fontChoice}', sans-serif`;
     letterBodyRendered.style.fontFamily = fam;
     letterTrailing.style.fontFamily = fam;
     letterBodyRendered.innerHTML = renderTextToHtml(mainText);
@@ -456,6 +576,7 @@
   // Convert a short Unicode string (signatory name, copies line, heading)
   // into rich HTML in the currently selected letter font, same as the body.
   function convertForLetter(unicodeText) {
+    if (letterLang === 'en') return escapeHtml(unicodeText);
     const fontChoice = selLetterFont.value;
     if (fontChoice === 'unicode') return escapeHtml(unicodeText);
     const isIsi = (fontChoice === 'IsiAbhaya');
@@ -469,6 +590,7 @@
   // Sinhala runs in the legacy font, which Hugo does not want here.)
   function convertSectionLine(text) {
     text = bulletizeLine(text || '');
+    if (letterLang === 'en') return escapeHtml(text);
     const fontChoice = selLetterFont.value;
     if (fontChoice === 'unicode') return escapeHtml(text);
     const isIsi = (fontChoice === 'IsiAbhaya');
@@ -483,6 +605,7 @@
   }
 
   function letterFontFamily() {
+    if (letterLang === 'en') return 'Arial, Helvetica, sans-serif';
     const f = selLetterFont.value;
     return f === 'unicode' ? "'Iskoola Potha', 'Noto Sans Sinhala', sans-serif" : `'${f}', sans-serif`;
   }
@@ -515,8 +638,8 @@
         <div class="sig-cell">
           <div class="sig-img-wrap"><img class="sig-img" src="${s.img}" alt=""></div>
           <div class="sig-line"></div>
-          <div class="sig-org">${convertForLetter(AWC_ORG_LINE)}</div>
-          <div class="sig-name">${convertForLetter(s.nameSi)}</div>
+          <div class="sig-org">${convertForLetter(letterLang === 'en' ? AWC_ORG_EN : AWC_ORG_LINE)}</div>
+          <div class="sig-name">${convertForLetter(letterLang === 'en' ? s.nameEn : s.nameSi)}</div>
         </div>`).join('') + '</div>';
     } else {
       letterSignatures.innerHTML = '';
@@ -525,13 +648,13 @@
     const copies = getCopiesLines();
     letterCopies.style.fontFamily = letterFontFamily();
     letterCopies.innerHTML = copies.length
-      ? `<div class="copies-heading">${convertForLetter('පිටපත්:')}</div>` + copies.map((l, i) => `<div class="copies-line"><span class="en-text">${i + 1}. </span>${convertSectionLine(l)}</div>`).join('')
+      ? `<div class="copies-heading">${convertForLetter(letterLang === 'en' ? 'Copies:' : 'පිටපත්:')}</div>` + copies.map((l, i) => `<div class="copies-line"><span class="en-text">${i + 1}. </span>${convertSectionLine(l)}</div>`).join('')
       : '';
 
     const annexIndexLines = annexIndexText.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
     letterAnnexIndex.style.fontFamily = letterFontFamily();
     letterAnnexIndex.innerHTML = annexIndexLines.length
-      ? `<div class="copies-heading">${convertForLetter('ඇමිණුම්:')}</div>` + annexIndexLines.map((l, i) => `<div class="copies-line"><span class="en-text">${i + 1}. </span>${convertSectionLine(l)}</div>`).join('')
+      ? `<div class="copies-heading">${convertForLetter(letterLang === 'en' ? 'Annexures:' : 'ඇමිණුම්:')}</div>` + annexIndexLines.map((l, i) => `<div class="copies-line"><span class="en-text">${i + 1}. </span>${convertSectionLine(l)}</div>`).join('')
       : '';
 
     setGap(gapSigsEl, gapBeforeSigs, 'Signatures', sigs.length > 0);
@@ -541,7 +664,7 @@
     letterAnnexures.style.fontFamily = letterFontFamily();
     letterAnnexures.innerHTML = annexures.map((a, i) => `
       <div class="annex-page">
-        <div class="annex-heading">${convertForLetter('ඇමුණුම ' + String(i + 1).padStart(2, '0'))}</div>
+        <div class="annex-heading">${convertForLetter(letterLang === 'en' ? 'Annexure ' + String(i + 1).padStart(2, '0') : 'ඇමුණුම ' + String(i + 1).padStart(2, '0'))}</div>
         <img class="annex-img" src="${a.dataUrl}" alt="">
       </div>`).join('');
 
@@ -556,7 +679,7 @@
         ${s.custom ? `<button class="sig-remove" data-remove-sig="${s.id}" title="Remove this signature">✕</button>` : ''}
       </label>`).join('');
     SIGNATORIES.forEach(s => {
-      document.getElementById('sigChk-' + s.id).addEventListener('change', updateLetterEnding);
+      document.getElementById('sigChk-' + s.id).addEventListener('change', () => { updateLetterEnding(); saveSettings(); });
     });
     sigCheckboxes.querySelectorAll('[data-remove-sig]').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -1046,7 +1169,7 @@
       }
     }
     annexures.forEach((a, i) => {
-      const heading = convertForLetter('ඇමුණුම ' + String(i + 1).padStart(2, '0'));
+      const heading = convertForLetter(letterLang === 'en' ? 'Annexure ' + String(i + 1).padStart(2, '0') : 'ඇමුණුම ' + String(i + 1).padStart(2, '0'));
       const maxH = SHEET.bottom - SHEET.top - 70;
       const scale = Math.min((SHEET.w - SHEET.padX * 2) / a.w, maxH / a.h, 1);
       const wpx = Math.round(a.w * scale);
@@ -1201,8 +1324,8 @@
     return bytes;
   }
 
-  // Download Native .DOCX File
-  async function downloadNativeDocx(includeLetterhead = false) {
+  // Build the native .DOCX (shared by Download and Share)
+  async function buildLetterDocx(includeLetterhead = false) {
     const text = inputText.value || sampleComplaintLetter;
     if (!text) {
       showToast('Text is empty', '⚠️');
@@ -1221,6 +1344,11 @@
     } else {
       // 4u-Bindumathi, FM-Malithi, FM-Abhaya all use unicodeToFM
       convertFn = unicodeToFM;
+    }
+    if (includeLetterhead && letterLang === 'en') {
+      // English letter: text stays exactly as typed, in Arial.
+      targetFont = 'Arial';
+      convertFn = null;
     }
 
     const options = {
@@ -1263,8 +1391,8 @@
             data: s.img.startsWith('data:') ? dataUrlToBytes(s.img) : await fetchBytes(s.img),
             ext: s.img.startsWith('data:') ? (s.ext || 'png') : s.img.split('.').pop().toLowerCase(),
             w: s.w, h: s.h,
-            org: AWC_ORG_LINE,
-            name: s.nameSi
+            org: letterLang === 'en' ? AWC_ORG_EN : AWC_ORG_LINE,
+            name: letterLang === 'en' ? s.nameEn : s.nameSi
           })));
         } catch (e) { /* signatures skipped if an image fails to load */ }
       }
@@ -1277,19 +1405,25 @@
         options.annexures = annexures.map((a, i) => ({
           data: dataUrlToBytes(a.dataUrl),
           ext: a.ext, w: a.w, h: a.h,
-          heading: 'ඇමුණුම ' + String(i + 1).padStart(2, '0')
+          heading: (letterLang === 'en' ? 'Annexure ' : 'ඇමුණුම ') + String(i + 1).padStart(2, '0')
         }));
       }
     }
 
     const blob = window.DocxBuilder.buildDocx(text, options);
-    const url = URL.createObjectURL(blob);
+    return { blob, filename: `letter-${targetFont}-${Date.now()}.docx`, targetFont };
+  }
+
+  async function downloadNativeDocx(includeLetterhead = false) {
+    const built = await buildLetterDocx(includeLetterhead);
+    if (!built) return;
+    const url = URL.createObjectURL(built.blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `letter-${targetFont}-${Date.now()}.docx`;
+    a.download = built.filename;
     a.click();
     URL.revokeObjectURL(url);
-    showToast(`Downloaded .DOCX (12pt, Justified) with ${targetFont}!`, '📥');
+    showToast(`Downloaded .DOCX (12pt, Justified) with ${built.targetFont}!`, '📥');
   }
 
   // Signatures + copies as HTML for the .DOC export (images referenced
@@ -1307,7 +1441,7 @@
       const cells = sigs.map(s => `
         <td style="width: 50%; vertical-align: bottom; padding: 18pt 12pt 0 0;">
           <img src="${assetBase}${s.img}" style="max-height: 42pt; max-width: 160pt;"><br>
-          <span style="border-top: 1pt dotted #999; display: block; padding-top: 4pt; font-family: '${fontName}', sans-serif; font-size: 11.5pt;">${convertForLetter(AWC_ORG_LINE)}<br>${convertForLetter(s.nameSi)}</span>
+          <span style="border-top: 1pt dotted #999; display: block; padding-top: 4pt; font-family: '${fontName}', sans-serif; font-size: 11.5pt;">${convertForLetter(letterLang === 'en' ? AWC_ORG_EN : AWC_ORG_LINE)}<br>${convertForLetter(letterLang === 'en' ? s.nameEn : s.nameSi)}</span>
         </td>`);
       let rows = '';
       for (let i = 0; i < cells.length; i += 2) {
@@ -1318,13 +1452,13 @@
     const copies = getCopiesLines();
     if (copies.length) {
       html += gapHtml(gapBeforeCopies);
-      html += `<p class="MsoNormal" style="margin-top: 18pt; font-weight: bold; font-family: '${fontName}', sans-serif; font-size: 12pt;">${convertForLetter('පිටපත්:')}</p>`;
+      html += `<p class="MsoNormal" style="margin-top: 18pt; font-weight: bold; font-family: '${fontName}', sans-serif; font-size: 12pt;">${convertForLetter(letterLang === 'en' ? 'Copies:' : 'පිටපත්:')}</p>`;
       html += copies.map((l, i) => `<p class="MsoNormal" style="font-family: '${fontName}', sans-serif; font-size: 12pt;"><span class="en-text">${i + 1}. </span>${convertSectionLine(l)}</p>`).join('\n');
     }
     const annexIndexLines = annexIndexText.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
     if (annexIndexLines.length) {
       html += gapHtml(gapBeforeAnnex);
-      html += `<p class="MsoNormal" style="margin-top: 18pt; font-weight: bold; font-family: '${fontName}', sans-serif; font-size: 12pt;">${convertForLetter('ඇමිණුම්:')}</p>`;
+      html += `<p class="MsoNormal" style="margin-top: 18pt; font-weight: bold; font-family: '${fontName}', sans-serif; font-size: 12pt;">${convertForLetter(letterLang === 'en' ? 'Annexures:' : 'ඇමිණුම්:')}</p>`;
       html += annexIndexLines.map((l, i) => `<p class="MsoNormal" style="font-family: '${fontName}', sans-serif; font-size: 12pt;"><span class="en-text">${i + 1}. </span>${convertSectionLine(l)}</p>`).join('\n');
     }
     return html;
@@ -1628,6 +1762,7 @@
   // Event Listeners
   inputText.addEventListener('input', runConversion);
   inputText.addEventListener('keyup', runConversion);
+  inputText.addEventListener('input', saveDraft);
   chkPreserveEnglish.addEventListener('change', runConversion);
   chkHighlightEnglish.addEventListener('change', updateEnglishHighlight);
 
@@ -1718,7 +1853,7 @@
   viewBtnConverter.addEventListener('click', () => setView('converter'));
   viewBtnLetter.addEventListener('click', () => setView('letter'));
 
-  selLetterhead.addEventListener('change', updateLetterheadDesign);
+  selLetterhead.addEventListener('change', () => { updateLetterheadDesign(); saveSettings(); });
 
   // Preview zoom controls
   function applyPreviewZoom() {
@@ -1745,18 +1880,138 @@
     letterBodyRendered.style.fontSize = letterSizePt + 'pt';
     letterTrailing.style.fontSize = letterSizePt + 'pt';
     if (previewView === 'exact') buildExactPreview();
+    saveSettings();
   });
   selLineSpacing.addEventListener('change', () => {
     letterLineHeight = parseFloat(selLineSpacing.value) || 1.15;
     letterBodyRendered.style.lineHeight = letterLineHeight;
     letterTrailing.style.lineHeight = letterLineHeight;
     if (previewView === 'exact') buildExactPreview();
+    saveSettings();
   });
   letterBodyRendered.style.lineHeight = letterLineHeight;
   letterTrailing.style.lineHeight = letterLineHeight;
-  selGapSigs.addEventListener('change', () => { gapBeforeSigs = selGapSigs.value; updateLetterEnding(); });
-  selGapCopies.addEventListener('change', () => { gapBeforeCopies = selGapCopies.value; updateLetterEnding(); });
-  selGapAnnex.addEventListener('change', () => { gapBeforeAnnex = selGapAnnex.value; updateLetterEnding(); });
+  selGapSigs.addEventListener('change', () => { gapBeforeSigs = selGapSigs.value; updateLetterEnding(); saveSettings(); });
+  selGapCopies.addEventListener('change', () => { gapBeforeCopies = selGapCopies.value; updateLetterEnding(); saveSettings(); });
+  selGapAnnex.addEventListener('change', () => { gapBeforeAnnex = selGapAnnex.value; updateLetterEnding(); saveSettings(); });
+
+  // Letter language: Sinhala (converted) or English (as typed)
+  selLangMode.addEventListener('change', () => {
+    letterLang = selLangMode.value;
+    updateLetterStudio();
+    saveSettings();
+    showToast(letterLang === 'en' ? 'English letter — text stays exactly as typed' : 'Sinhala letter — text converts to the letter font', '🌐');
+  });
+
+  // Templates: built-in AWC setups + Hugo's own saved templates
+  const applyAwcPreset = (lang) => {
+    applyTemplateState({
+      settings: {
+        letterhead: 'awc', lang,
+        sigTicks: Object.fromEntries(SIGNATORIES.map(s => [s.id, true]))
+      }
+    });
+    showToast(lang === 'en' ? 'AWC English setup applied — all signatories on, English names' : 'AWC Sinhala setup applied — all signatories on', '🗂️');
+  };
+  document.getElementById('btnPresetSi').addEventListener('click', () => applyAwcPreset('si'));
+  document.getElementById('btnPresetEn').addEventListener('click', () => applyAwcPreset('en'));
+  document.getElementById('btnSaveTemplate').addEventListener('click', () => {
+    const name = (window.prompt('Template name:', '') || '').trim();
+    if (!name) return;
+    const t = loadTemplates();
+    t[name] = {
+      text: inputText.value, copies: copiesText.value, annexIndex: annexIndexText.value,
+      settings: currentSettings()
+    };
+    saveTemplates(t);
+    refreshTemplateList();
+    selTemplate.value = name;
+    showToast(`Template "${name}" saved`, '💾');
+  });
+  document.getElementById('btnApplyTemplate').addEventListener('click', () => {
+    const name = selTemplate.value;
+    const t = loadTemplates();
+    if (!name || !t[name]) { showToast('No template selected', 'ℹ️'); return; }
+    applyTemplateState(t[name]);
+    showToast(`Template "${name}" applied`, '🗂️');
+  });
+  document.getElementById('btnDeleteTemplate').addEventListener('click', () => {
+    const name = selTemplate.value;
+    const t = loadTemplates();
+    if (!name || !t[name]) { showToast('No template selected', 'ℹ️'); return; }
+    delete t[name];
+    saveTemplates(t);
+    refreshTemplateList();
+    showToast(`Template "${name}" deleted`, '🗑');
+  });
+  document.getElementById('btnNewLetter').addEventListener('click', () => {
+    if (!window.confirm('Start a new blank letter? The current draft will be cleared (templates and settings are kept).')) return;
+    inputText.value = '';
+    copiesText.value = '';
+    annexIndexText.value = '';
+    annexures = [];
+    renderAnnexList();
+    try { localStorage.removeItem(LS_DRAFT); localStorage.removeItem(LS_DRAFT_ANNEX); } catch (e) { /* ignore */ }
+    updateLetterStudio();
+    showToast('New blank letter — start typing', '🧹');
+  });
+
+  // Backup / restore: one JSON file with everything stored on-device
+  document.getElementById('btnBackup').addEventListener('click', () => {
+    const data = { app: 'sinhala-letter-maker', version: 1 };
+    [LS_DRAFT, LS_DRAFT_ANNEX, LS_SETTINGS, LS_TEMPLATES, 'awc_custom_signatures'].forEach(k => {
+      try { const v = localStorage.getItem(k); if (v !== null) data[k] = v; } catch (e) { /* ignore */ }
+    });
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `letter-maker-backup-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Backup downloaded', '⬇');
+  });
+  document.getElementById('btnRestore').addEventListener('click', () => restoreFile.click());
+  restoreFile.addEventListener('change', () => {
+    const file = restoreFile.files && restoreFile.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        [LS_DRAFT, LS_DRAFT_ANNEX, LS_SETTINGS, LS_TEMPLATES, 'awc_custom_signatures'].forEach(k => {
+          if (typeof data[k] === 'string') localStorage.setItem(k, data[k]);
+        });
+        showToast('Backup restored — reloading…', '⬆');
+        setTimeout(() => location.reload(), 600);
+      } catch (e) {
+        showToast('That file is not a valid backup', '⚠️');
+      }
+    };
+    reader.readAsText(file);
+    restoreFile.value = '';
+  });
+
+  // Share the DOCX straight to WhatsApp / email (Web Share API);
+  // falls back to a download where file sharing is unavailable.
+  btnShareDocx.addEventListener('click', async () => {
+    const built = await buildLetterDocx(true);
+    if (!built) return;
+    const file = new File([built.blob], built.filename, {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: built.filename }); } catch (e) { /* cancelled */ }
+    } else {
+      const url = URL.createObjectURL(built.blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = built.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Sharing is not supported in this browser — DOCX downloaded instead', '📤');
+    }
+  });
   btnCopyLetter.addEventListener('click', copyLetterFormatted);
 
   // Paste: allow formatted paste into the letter, then strip foreign
@@ -1805,8 +2060,8 @@
     reader.readAsDataURL(file);
   });
 
-  copiesText.addEventListener('input', updateLetterEnding);
-  annexIndexText.addEventListener('input', updateLetterEnding);
+  copiesText.addEventListener('input', () => { updateLetterEnding(); saveDraft(); });
+  annexIndexText.addEventListener('input', () => { updateLetterEnding(); saveDraft(); });
 
   annexInput.addEventListener('change', () => {
     const files = Array.from(annexInput.files || []);
@@ -1838,6 +2093,7 @@
     fontSelect.value = chosen;
     localStorage.setItem('sinhala_selected_font', chosen);
     updateLetterStudio();
+    saveSettings();
   });
 
   btnThemeToggle.addEventListener('click', () => {
@@ -1898,10 +2154,13 @@
   loadCustomSignatures();
   renderSigCheckboxes();
   renderAnnexList();
-  updateLetterheadDesign();
+  refreshTemplateList();
 
-  // Load sample on start
-  inputText.value = sampleComplaintLetter;
+  // Restore the auto-saved draft + remembered settings; fall back
+  // to the sample letter on a first visit.
+  const hadDraft = restoreSavedState();
+  if (!hadDraft) inputText.value = sampleComplaintLetter;
+  updateLetterheadDesign();
   runConversion();
   loadEmbeddedFonts();
 
