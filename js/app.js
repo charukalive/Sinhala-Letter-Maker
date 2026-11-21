@@ -470,7 +470,34 @@
   // to the current selection, alignment and size apply to the letter.
   function applyInlineFormat(command) {
     letterBodyRendered.focus();
+    const r = letterRange();
+    if (r) {
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }
     document.execCommand(command, false, null);
+  }
+
+  // Remember the cursor/selection inside the letter body: tapping a
+  // toolbar button on a phone drops the live selection, so toolbar
+  // actions restore this saved range instead of acting at position 0.
+  let savedLetterRange = null;
+  document.addEventListener('selectionchange', () => {
+    const sel = window.getSelection();
+    if (sel.rangeCount && letterBodyRendered.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+      savedLetterRange = sel.getRangeAt(0).cloneRange();
+    }
+  });
+  function letterRange() {
+    const sel = window.getSelection();
+    if (sel.rangeCount && letterBodyRendered.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+      return sel.getRangeAt(0);
+    }
+    if (savedLetterRange && letterBodyRendered.contains(savedLetterRange.commonAncestorContainer)) {
+      return savedLetterRange;
+    }
+    return null;
   }
 
   // Insert a manual page break at the cursor: everything after it
@@ -483,7 +510,12 @@
     marker.textContent = '⤓ PAGE BREAK — NEXT PAGE STARTS HERE';
     letterBodyRendered.focus();
     const sel = window.getSelection();
-    if (sel.rangeCount && letterBodyRendered.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+    const activeRange = letterRange();
+    if (activeRange) {
+      sel.removeAllRanges();
+      sel.addRange(activeRange);
+    }
+    if (activeRange) {
       const range = sel.getRangeAt(0);
       range.deleteContents();
       const br1 = document.createElement('br');
@@ -645,15 +677,25 @@
       cur = { top, avail: bottom - top, used: 0, units: [] };
       sheets.push(cur);
     };
+    const isEmptyLine = (u) => u.kind === 'line' &&
+      (u.html === '<div class="sheet-line">&nbsp;</div>' || u.html === '<div class="sheet-line"></div>');
     newSheet();
     for (const u of units) {
       if (u.break) {
-        if (cur.units.length) newSheet();
+        // A break only starts a new page when real content precedes
+        // it — a break at the very start must not blank page 1.
+        if (cur.units.some(x => !isEmptyLine(x))) newSheet();
         continue;
       }
       if (cur.units.length && cur.used + u.h > cur.avail) newSheet();
       cur.units.push(u);
       cur.used += u.h;
+    }
+    // Never emit a blank sheet (e.g. from a break at the very end).
+    for (let i = sheets.length - 1; i >= 0; i--) {
+      if (sheets.length > 1 && !sheets[i].units.some(x => !isEmptyLine(x))) {
+        sheets.splice(i, 1);
+      }
     }
     annexures.forEach((a, i) => {
       const heading = convertForLetter('ඇමුණුම ' + String(i + 1).padStart(2, '0'));
