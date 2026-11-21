@@ -95,6 +95,12 @@
   // Letter formatting state (Letter Studio)
   const selLetterSize = document.getElementById('selLetterSize');
   const selLineSpacing = document.getElementById('selLineSpacing');
+  const selGapSigs = document.getElementById('selGapSigs');
+  const selGapCopies = document.getElementById('selGapCopies');
+  const selGapAnnex = document.getElementById('selGapAnnex');
+  const gapSigsEl = document.getElementById('gapSigs');
+  const gapCopiesEl = document.getElementById('gapCopies');
+  const gapAnnexEl = document.getElementById('gapAnnex');
   const btnCopyLetter = document.getElementById('btnCopyLetter');
   const newSigNameSi = document.getElementById('newSigNameSi');
   const newSigNameEn = document.getElementById('newSigNameEn');
@@ -103,6 +109,8 @@
   let letterAlign = 'both'; // 'both' | 'left' | 'center' | 'right'
   let letterSizePt = 12;
   let letterLineHeight = 1.15;
+  // Optional gap before each ending section: 'none' | 'space' | 'break'
+  let gapBeforeSigs = 'none', gapBeforeCopies = 'none', gapBeforeAnnex = 'none';
 
   // Custom signatures are stored on this device only (localStorage)
   function loadCustomSignatures() {
@@ -336,7 +344,13 @@
     };
   }
 
+  // A line that starts with * is a point — render the * as a
+  // bullet ● (in the English font, like Hugo's other symbols). The
+  // source text keeps the *; only the rendering changes.
+  const bulletizeLine = (line) => line.replace(/^(\s*)\*[ \t]*/, '$1● ');
+
   function renderTextToHtml(text) {
+    text = (text || '').split('\n').map(bulletizeLine).join('\n');
     const fontChoice = selLetterFont.value;
     if (fontChoice === 'unicode') return escapeHtml(text).replace(/\n/g, '<br>');
     const isIsi = (fontChoice === 'IsiAbhaya');
@@ -454,6 +468,7 @@
   // the legacy font. (The general converter keeps the spaces inside
   // Sinhala runs in the legacy font, which Hugo does not want here.)
   function convertSectionLine(text) {
+    text = bulletizeLine(text || '');
     const fontChoice = selLetterFont.value;
     if (fontChoice === 'unicode') return escapeHtml(text);
     const isIsi = (fontChoice === 'IsiAbhaya');
@@ -485,6 +500,14 @@
 
   // Render signatures grid, copies list and annexure pages on the A4 page
   function updateLetterEnding() {
+    // Gap indicators between the ending sections (edit view only —
+    // the sheets, print and DOCX apply the real space / page break).
+    const setGap = (el, mode, label, hasContent) => {
+      if (!el) return;
+      const show = hasContent && mode !== 'none';
+      el.className = 'section-gap' + (show ? ' ' + mode : '');
+      el.textContent = show && mode === 'break' ? `⤓ PAGE BREAK — ${label} starts on a new page` : '';
+    };
     const sigs = getSelectedSignatories();
     letterSignatures.style.fontFamily = letterFontFamily();
     if (sigs.length) {
@@ -510,6 +533,10 @@
     letterAnnexIndex.innerHTML = annexIndexLines.length
       ? `<div class="copies-heading">${convertForLetter('ඇමිණුම්:')}</div>` + annexIndexLines.map((l, i) => `<div class="copies-line"><span class="en-text">${i + 1}. </span>${convertSectionLine(l)}</div>`).join('')
       : '';
+
+    setGap(gapSigsEl, gapBeforeSigs, 'Signatures', sigs.length > 0);
+    setGap(gapCopiesEl, gapBeforeCopies, 'Copies', copies.length > 0);
+    setGap(gapAnnexEl, gapBeforeAnnex, 'Annexure list', annexIndexLines.length > 0);
 
     letterAnnexures.style.fontFamily = letterFontFamily();
     letterAnnexures.innerHTML = annexures.map((a, i) => `
@@ -914,19 +941,32 @@
         units.push({ html: wrapped, h: html ? Math.ceil(measureSheetHtml(wrapped)) + 1 : lineH, kind: 'line', frag: html });
       });
     };
+    // Optional user-chosen gap before an ending section: extra
+    // space, or a page break so the section starts on a new page.
+    const gapUnitFor = (mode) => mode === 'break'
+      ? { html: '', h: 0, kind: 'break', break: true }
+      : mode === 'space'
+        ? { html: `<div style="height:${lineH * 2}px"></div>`, h: lineH * 2, kind: 'spacer' }
+        : null;
     addLines(letterBodyRendered);
     if (letterSignatures.innerHTML.trim()) {
+      const g = gapUnitFor(gapBeforeSigs);
+      if (g) units.push(g);
       const html = `<div class="sheet-block">${letterSignatures.innerHTML}</div>`;
       units.push({ html, h: Math.ceil(measureSheetHtml(html)) + 14, kind: 'block' });
     }
     if (letterCopies.innerHTML.trim()) {
-      units.push({ html: '<div style="height:16px"></div>', h: 16, kind: 'spacer' });
+      const g = gapUnitFor(gapBeforeCopies);
+      if (g && g.break) units.push(g);
+      else units.push({ html: `<div style="height:${g ? 16 + lineH * 2 : 16}px"></div>`, h: g ? 16 + lineH * 2 : 16, kind: 'spacer' });
       Array.from(letterCopies.children).forEach(ch => {
         units.push({ html: ch.outerHTML, h: Math.ceil(measureSheetHtml(ch.outerHTML)) + 1, kind: 'line' });
       });
     }
     if (letterAnnexIndex.innerHTML.trim()) {
-      units.push({ html: '<div style="height:16px"></div>', h: 16, kind: 'spacer' });
+      const g = gapUnitFor(gapBeforeAnnex);
+      if (g && g.break) units.push(g);
+      else units.push({ html: `<div style="height:${g ? 16 + lineH * 2 : 16}px"></div>`, h: g ? 16 + lineH * 2 : 16, kind: 'spacer' });
       Array.from(letterAnnexIndex.children).forEach(ch => {
         units.push({ html: ch.outerHTML, h: Math.ceil(measureSheetHtml(ch.outerHTML)) + 1, kind: 'line' });
       });
@@ -1229,9 +1269,10 @@
         } catch (e) { /* signatures skipped if an image fails to load */ }
       }
       const copies = getCopiesLines();
-      if (copies.length) options.copies = copies;
+      if (copies.length) options.copies = copies.map(bulletizeLine);
       const annexIndexLines = annexIndexText.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-      if (annexIndexLines.length) options.annexIndex = annexIndexLines;
+      if (annexIndexLines.length) options.annexIndex = annexIndexLines.map(bulletizeLine);
+      options.sectionGaps = { sigs: gapBeforeSigs, copies: gapBeforeCopies, annex: gapBeforeAnnex };
       if (annexures.length) {
         options.annexures = annexures.map((a, i) => ({
           data: dataUrlToBytes(a.dataUrl),
@@ -1257,8 +1298,12 @@
   function buildEndingHtmlForDoc(fontName) {
     const assetBase = location.href.replace(/[^/]*$/, '');
     const sigs = getSelectedSignatories();
+    const gapHtml = (mode) => mode === 'break'
+      ? '<p class="MsoNormal" style="page-break-before: always; margin: 0;"></p>'
+      : mode === 'space' ? '<p class="MsoNormal"><br><br></p>' : '';
     let html = '';
     if (sigs.length) {
+      html += gapHtml(gapBeforeSigs);
       const cells = sigs.map(s => `
         <td style="width: 50%; vertical-align: bottom; padding: 18pt 12pt 0 0;">
           <img src="${assetBase}${s.img}" style="max-height: 42pt; max-width: 160pt;"><br>
@@ -1272,11 +1317,13 @@
     }
     const copies = getCopiesLines();
     if (copies.length) {
+      html += gapHtml(gapBeforeCopies);
       html += `<p class="MsoNormal" style="margin-top: 18pt; font-weight: bold; font-family: '${fontName}', sans-serif; font-size: 12pt;">${convertForLetter('පිටපත්:')}</p>`;
       html += copies.map((l, i) => `<p class="MsoNormal" style="font-family: '${fontName}', sans-serif; font-size: 12pt;"><span class="en-text">${i + 1}. </span>${convertSectionLine(l)}</p>`).join('\n');
     }
     const annexIndexLines = annexIndexText.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
     if (annexIndexLines.length) {
+      html += gapHtml(gapBeforeAnnex);
       html += `<p class="MsoNormal" style="margin-top: 18pt; font-weight: bold; font-family: '${fontName}', sans-serif; font-size: 12pt;">${convertForLetter('ඇමිණුම්:')}</p>`;
       html += annexIndexLines.map((l, i) => `<p class="MsoNormal" style="font-family: '${fontName}', sans-serif; font-size: 12pt;"><span class="en-text">${i + 1}. </span>${convertSectionLine(l)}</p>`).join('\n');
     }
@@ -1707,6 +1754,9 @@
   });
   letterBodyRendered.style.lineHeight = letterLineHeight;
   letterTrailing.style.lineHeight = letterLineHeight;
+  selGapSigs.addEventListener('change', () => { gapBeforeSigs = selGapSigs.value; updateLetterEnding(); });
+  selGapCopies.addEventListener('change', () => { gapBeforeCopies = selGapCopies.value; updateLetterEnding(); });
+  selGapAnnex.addEventListener('change', () => { gapBeforeAnnex = selGapAnnex.value; updateLetterEnding(); });
   btnCopyLetter.addEventListener('click', copyLetterFormatted);
 
   // Paste: allow formatted paste into the letter, then strip foreign

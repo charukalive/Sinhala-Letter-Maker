@@ -266,6 +266,36 @@
           <textarea id="annexIndexText" class="ending-textarea" rows="3" placeholder="One annexure per line, e.g.&#10;සිද්ධියට අදාළ ඡායාරූප&#10;අදාළ ලේඛන වාර්තාව (DMT Report)"></textarea>
         </div>
         <div class="ending-group">
+          <div class="ending-title">↕️ Space / page break before sections</div>
+          <div style="margin-bottom: 0.4rem;">
+            <label class="format-size-label">Before signatures:
+              <select id="selGapSigs" class="control-select">
+                <option value="none" selected>Normal</option>
+                <option value="space">Add space</option>
+                <option value="break">Page break</option>
+              </select>
+            </label>
+          </div>
+          <div style="margin-bottom: 0.4rem;">
+            <label class="format-size-label">Before copies (පිටපත්):
+              <select id="selGapCopies" class="control-select">
+                <option value="none" selected>Normal</option>
+                <option value="space">Add space</option>
+                <option value="break">Page break</option>
+              </select>
+            </label>
+          </div>
+          <div>
+            <label class="format-size-label">Before annexure list (ඇමිණුම්):
+              <select id="selGapAnnex" class="control-select">
+                <option value="none" selected>Normal</option>
+                <option value="space">Add space</option>
+                <option value="break">Page break</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="ending-group">
           <div class="ending-title">🖼️ Annexures (ඇමුණුම්) — images</div>
           <input type="file" id="annexInput" accept="image/*" multiple class="ending-file">
           <div class="annex-list" id="annexList"><span class="annex-empty">No annexures added</span></div>
@@ -345,12 +375,15 @@
           </div>
 
           <!-- Signatures Grid -->
+          <div class="section-gap" id="gapSigs"></div>
           <div class="letter-signatures" id="letterSignatures"></div>
 
           <!-- Copies (පිටපත්) -->
+          <div class="section-gap" id="gapCopies"></div>
           <div class="letter-copies" id="letterCopies"></div>
 
           <!-- Annexure index (ඇමිණුම්) -->
+          <div class="section-gap" id="gapAnnex"></div>
           <div class="letter-copies" id="letterAnnexIndex"></div>
 
           <!-- Trailing sections lifted from the body (copies / annexure index typed in the letter) -->
@@ -461,7 +494,7 @@
   <!-- Footer -->
   <footer class="app-footer">
     <div>Sinhala Font & Letter Studio • 4u-Bindumathi • FM-Malithi • FM-Abhaya • IsiAbhaya • 100% Mobile Ready</div>
-    <div style="margin-top: 0.25rem; opacity: 0.75;">Build v21 — if this number is lower than the latest I sent you, close the app fully and reopen it</div>
+    <div style="margin-top: 0.25rem; opacity: 0.75;">Build v22 — if this number is lower than the latest I sent you, close the app fully and reopen it</div>
   </footer>
 
   <!-- Scripts -->

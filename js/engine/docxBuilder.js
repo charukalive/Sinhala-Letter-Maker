@@ -137,6 +137,7 @@
       convertSinhalaFn = null,
       fontSizePt = 12,
       lineHeight = 1,
+      sectionGaps = {},
       richLines = null,
       trailingLines = null,
       bodyAlign = 'both',
@@ -381,8 +382,17 @@
     }
     }
 
+    // Optional gap before an ending section: extra space (two
+    // blank paragraphs) or a page break starting it on a new page.
+    const gapXml = (mode) => mode === 'break'
+      ? '<w:p><w:r><w:br w:type="page"/></w:r></w:p>'
+      : mode === 'space'
+        ? `<w:p><w:pPr><w:spacing w:line="${lineVal}" w:lineRule="auto" w:before="0" w:after="0"/></w:pPr></w:p>`.repeat(2)
+        : '';
+
     // Signatures grid (2 columns): signature image, dotted line, org, name
     if (signatures.length && signatureRels.length) {
+      bodyXml += gapXml(sectionGaps.sigs);
       bodyXml += '<w:p><w:pPr><w:spacing w:before="360" w:after="0"/></w:pPr></w:p>';
       const cellW = 4513;
       const cellXml = (idx) => {
@@ -412,6 +422,7 @@
 
     // Copies (පිටපත්) list
     if (copies.length) {
+      bodyXml += gapXml(sectionGaps.copies);
       bodyXml += `<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="360" w:after="60"/></w:pPr>${textRunsXml('පිටපත්:', true)}</w:p>`;
       copies.forEach((line, i) => {
         bodyXml += `<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0"/></w:pPr>${textRunsXml(`${i + 1}. ${line}`, false, true)}</w:p>`;
@@ -420,6 +431,7 @@
 
     // Annexure index (ඇමිණුම්) list
     if (annexIndex.length) {
+      bodyXml += gapXml(sectionGaps.annex);
       bodyXml += `<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="360" w:after="60"/></w:pPr>${textRunsXml('ඇමිණුම්:', true)}</w:p>`;
       annexIndex.forEach((line, i) => {
         bodyXml += `<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0"/></w:pPr>${textRunsXml(`${i + 1}. ${line}`, false, true)}</w:p>`;

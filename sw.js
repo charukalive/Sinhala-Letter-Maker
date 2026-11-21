@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sinhala-font-studio-v21-paraspaces';
+const CACHE_NAME = 'sinhala-font-studio-v22-bullets-gaps';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

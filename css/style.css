@@ -1025,6 +1025,25 @@ textarea.editor-input::placeholder {
   background-position: bottom left;
 }
 
+/* Gap indicators between the ending sections (edit view) */
+.section-gap {
+  display: none;
+}
+.section-gap.space {
+  display: block;
+  height: 2.2em;
+}
+.section-gap.break {
+  display: block;
+  margin: 0.5rem 2.5rem;
+  padding: 0.2rem 0;
+  border-top: 2px dashed #94a3b8;
+  color: #64748b;
+  font-size: 11px;
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+
 /* Trailing sections (copies / annexure index) on the A4 page */
 .letter-trailing {
   padding: 0.5rem 2.5rem 1rem 2.5rem;
