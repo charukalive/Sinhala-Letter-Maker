@@ -213,7 +213,7 @@
           <div class="control-item">
             <label for="selLetterhead">Letterhead:</label>
             <select id="selLetterhead" class="control-select">
-              <option value="awc">Animal Welfare Coalition (AWC)</option>
+              <option value="awc">Animal Welfare Coalition (AWC) — Real Letterhead</option>
               <option value="classic">Classic Government / Corporate</option>
               <option value="none">Plain Paper (No Banner)</option>
             </select>
@@ -243,9 +243,29 @@
         </div>
       </div>
 
+      <!-- Letter Ending: Signatures / Copies / Annexures -->
+      <div class="letter-ending-panel">
+        <div class="ending-group">
+          <div class="ending-title">✍️ Signatures (අත්සන්)</div>
+          <div class="sig-check-grid" id="sigCheckboxes"></div>
+        </div>
+        <div class="ending-group">
+          <div class="ending-title">📋 Copies (පිටපත්)</div>
+          <textarea id="copiesText" class="ending-textarea" rows="4" placeholder="One copy recipient per line, e.g.&#10;ගරු ජනාධිපතිතුමා&#10;ගරු අග්‍රාමාත්‍යතුමිය"></textarea>
+        </div>
+        <div class="ending-group">
+          <div class="ending-title">📎 Annexures (ඇමිණුම්) — images</div>
+          <input type="file" id="annexInput" accept="image/*" multiple class="ending-file">
+          <div class="annex-list" id="annexList"><span class="annex-empty">No annexures added</span></div>
+        </div>
+      </div>
+
       <!-- Formal A4 Paper Layout Preview -->
       <div class="paper-container">
         <div class="a4-page" id="printableA4Page">
+
+          <!-- Real AWC Letterhead Background (page 1) -->
+          <img class="letterhead-bg" id="letterheadBg" src="assets/awc-letterhead.jpg" alt="" style="display: none;">
 
           <!-- Letterhead Banner -->
           <div class="letter-header-banner" id="letterHeaderBanner">
@@ -259,6 +279,12 @@
             <!-- Dynamic Content Injected Here -->
           </div>
 
+          <!-- Signatures Grid -->
+          <div class="letter-signatures" id="letterSignatures"></div>
+
+          <!-- Copies (පිටපත්) -->
+          <div class="letter-copies" id="letterCopies"></div>
+
           <!-- Formal Letter Footer Banner -->
           <div class="letter-footer-banner" id="letterFooterBanner">
             <div class="letter-footer-item">
@@ -271,6 +297,9 @@
               <span>📍</span> <span id="footAddress">No 02 Edward Place, Kalubowila</span>
             </div>
           </div>
+
+          <!-- Annexures (ඇමිණුම්) -->
+          <div class="letter-annexures" id="letterAnnexures"></div>
 
         </div>
       </div>

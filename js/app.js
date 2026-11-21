@@ -53,6 +53,33 @@
   const btnLetterDocx = document.getElementById('btnLetterDocx');
   const btnLetterDoc = document.getElementById('btnLetterDoc');
 
+  // DOM Elements - Letter Ending (signatures / copies / annexures)
+  const printableA4Page = document.getElementById('printableA4Page');
+  const letterheadBg = document.getElementById('letterheadBg');
+  const letterSignatures = document.getElementById('letterSignatures');
+  const letterCopies = document.getElementById('letterCopies');
+  const letterAnnexures = document.getElementById('letterAnnexures');
+  const sigCheckboxes = document.getElementById('sigCheckboxes');
+  const copiesText = document.getElementById('copiesText');
+  const annexInput = document.getElementById('annexInput');
+  const annexList = document.getElementById('annexList');
+
+  // AWC signatories: signature images extracted from Hugo's own letter
+  // (16th October 2026 Letter to Min of Environment .docx), in the
+  // letter's 2-column grid order. Org line is the same for all.
+  const AWC_ORG_LINE = 'සත්ව සුබසාධන සංසදය';
+  const SIGNATORIES = [
+    { id: 'gihan', nameSi: 'ගිහාන් දිනුෂ්ක', nameEn: 'Gihan Dinushka', img: 'assets/signatures/gihan-dinushka.jpg', w: 389, h: 194 },
+    { id: 'chamith', nameSi: 'වෛද්‍ය චමිත් නානායක්කාර', nameEn: 'Dr Chamith Nanayakkara', img: 'assets/signatures/chamith-nanayakkara.jpg', w: 246, h: 204 },
+    { id: 'thilini', nameSi: 'තිලිනි ගමගේ', nameEn: 'Thilini Gamage', img: 'assets/signatures/thilini-gamage.jpg', w: 602, h: 261 },
+    { id: 'charuka', nameSi: 'චාරුක වික්‍රමසේකර', nameEn: 'Charuka Wickramasekara', img: 'assets/signatures/charuka-wickramasekara.png', w: 214, h: 91 },
+    { id: 'mihiri', nameSi: 'මිහිරි සිරිවර්ධන', nameEn: 'Mihiri Siriwardena', img: 'assets/signatures/mihiri-siriwardena.png', w: 176, h: 55 },
+    { id: 'aravinda', nameSi: 'අරවින්ද ප්‍රනාන්දු', nameEn: 'Aravinda Fernando', img: 'assets/signatures/aravinda-fernando.jpg', w: 489, h: 173 }
+  ];
+
+  // Annexure images added by the user: { name, dataUrl, ext, w, h }
+  let annexures = [];
+
   // Theme & Modal
   const btnThemeToggle = document.getElementById('btnThemeToggle');
   const btnCheatSheet = document.getElementById('btnCheatSheet');
@@ -274,6 +301,93 @@
 
     letterBodyRendered.innerHTML = richContent;
     updateEnglishHighlight();
+    updateLetterEnding();
+  }
+
+  // Convert a short Unicode string (signatory name, copies line, heading)
+  // into rich HTML in the currently selected letter font, same as the body.
+  function convertForLetter(unicodeText) {
+    const fontChoice = selLetterFont.value;
+    if (fontChoice === 'unicode') return escapeHtml(unicodeText);
+    const isIsi = (fontChoice === 'IsiAbhaya');
+    const convertFn = isIsi ? unicodeToIsi : unicodeToFM;
+    return window.MixedFontFormatter.convertWithPreservation(unicodeText, isIsi ? 'isi' : 'fm', convertFn, fontChoice).richHtml;
+  }
+
+  function letterFontFamily() {
+    const f = selLetterFont.value;
+    return f === 'unicode' ? "'Iskoola Potha', 'Noto Sans Sinhala', sans-serif" : `'${f}', sans-serif`;
+  }
+
+  function getSelectedSignatories() {
+    return SIGNATORIES.filter(s => {
+      const cb = document.getElementById('sigChk-' + s.id);
+      return cb && cb.checked;
+    });
+  }
+
+  function getCopiesLines() {
+    return copiesText.value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  }
+
+  // Render signatures grid, copies list and annexure pages on the A4 page
+  function updateLetterEnding() {
+    const sigs = getSelectedSignatories();
+    letterSignatures.style.fontFamily = letterFontFamily();
+    if (sigs.length) {
+      letterSignatures.innerHTML = '<div class="sig-grid">' + sigs.map(s => `
+        <div class="sig-cell">
+          <div class="sig-img-wrap"><img class="sig-img" src="${s.img}" alt=""></div>
+          <div class="sig-line"></div>
+          <div class="sig-org">${convertForLetter(AWC_ORG_LINE)}</div>
+          <div class="sig-name">${convertForLetter(s.nameSi)}</div>
+        </div>`).join('') + '</div>';
+    } else {
+      letterSignatures.innerHTML = '';
+    }
+
+    const copies = getCopiesLines();
+    letterCopies.style.fontFamily = letterFontFamily();
+    letterCopies.innerHTML = copies.length
+      ? `<div class="copies-heading">${convertForLetter('පිටපත්:')}</div>` + copies.map((l, i) => `<div class="copies-line">${i + 1}. ${convertForLetter(l)}</div>`).join('')
+      : '';
+
+    letterAnnexures.style.fontFamily = letterFontFamily();
+    letterAnnexures.innerHTML = annexures.map((a, i) => `
+      <div class="annex-page">
+        <div class="annex-heading">${convertForLetter('ඇමුණුම ' + String(i + 1).padStart(2, '0'))}</div>
+        <img class="annex-img" src="${a.dataUrl}" alt="">
+      </div>`).join('');
+  }
+
+  function renderSigCheckboxes() {
+    sigCheckboxes.innerHTML = SIGNATORIES.map(s => `
+      <label class="sig-check-item">
+        <input type="checkbox" id="sigChk-${s.id}" checked>
+        <span>${escapeHtml(s.nameEn)}</span>
+      </label>`).join('');
+    SIGNATORIES.forEach(s => {
+      document.getElementById('sigChk-' + s.id).addEventListener('change', updateLetterEnding);
+    });
+  }
+
+  function renderAnnexList() {
+    if (!annexures.length) {
+      annexList.innerHTML = '<span class="annex-empty">No annexures added</span>';
+      return;
+    }
+    annexList.innerHTML = annexures.map((a, i) => `
+      <div class="annex-list-item">
+        <span>ඇමුණුම ${String(i + 1).padStart(2, '0')} — ${escapeHtml(a.name)}</span>
+        <button class="annex-remove" data-annex-idx="${i}" title="Remove">✕</button>
+      </div>`).join('');
+    annexList.querySelectorAll('.annex-remove').forEach(btn => {
+      btn.addEventListener('click', () => {
+        annexures.splice(parseInt(btn.dataset.annexIdx, 10), 1);
+        renderAnnexList();
+        updateLetterEnding();
+      });
+    });
   }
 
   // Letterhead Design Presets
@@ -282,7 +396,11 @@
     if (design === 'none') {
       letterHeaderBanner.style.display = 'none';
       letterFooterBanner.style.display = 'none';
+      letterheadBg.style.display = 'none';
+      printableA4Page.classList.remove('has-letterhead');
     } else if (design === 'classic') {
+      letterheadBg.style.display = 'none';
+      printableA4Page.classList.remove('has-letterhead');
       letterHeaderBanner.style.display = 'block';
       letterFooterBanner.style.display = 'flex';
       letterHeadTitle.textContent = 'OFFICIAL COMMUNICATIONS & LEGAL ADVOCACY';
@@ -291,13 +409,18 @@
       footPhone.textContent = '+94 11 234 5678';
       footAddress.textContent = 'Colombo 07, Sri Lanka';
     } else {
-      letterHeaderBanner.style.display = 'block';
-      letterFooterBanner.style.display = 'flex';
+      // AWC: use the real letterhead artwork as the page-1 background
+      // (extracted from Hugo's own Word letter); the HTML text banners
+      // are hidden, their values kept only as the .DOC export fallback.
+      letterHeaderBanner.style.display = 'none';
+      letterFooterBanner.style.display = 'none';
+      letterheadBg.style.display = 'block';
+      printableA4Page.classList.add('has-letterhead');
       letterHeadTitle.textContent = 'ANIMAL WELFARE COALITION (AWC) - SRI LANKA';
       letterHeadSub.textContent = 'ANIMAL PROTECTION, REHABILITATION & ADVOCACY';
       footEmail.textContent = 'awcsrilanka@gmail.com';
       footPhone.textContent = '+94 71 915 9992';
-      footAddress.textContent = 'No 02 Edward Place, Kalubowila';
+      footAddress.textContent = 'No 02 Edward Place, Sri Saranankara Mawatha, Kalubowila';
     }
   }
 
@@ -353,8 +476,22 @@
     }
   }
 
+  // Fetch an app asset as raw bytes (for DOCX embedding)
+  async function fetchBytes(url) {
+    const res = await fetch(url);
+    return new Uint8Array(await res.arrayBuffer());
+  }
+
+  function dataUrlToBytes(dataUrl) {
+    const b64 = dataUrl.split(',')[1] || '';
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+  }
+
   // Download Native .DOCX File
-  function downloadNativeDocx(includeLetterhead = false) {
+  async function downloadNativeDocx(includeLetterhead = false) {
     const text = inputText.value || sampleComplaintLetter;
     if (!text) {
       showToast('Text is empty', '⚠️');
@@ -382,10 +519,42 @@
       fontSizePt: 12
     };
 
-    if (includeLetterhead && selLetterhead.value !== 'none') {
+    const useLetterheadImage = includeLetterhead && selLetterhead.value === 'awc';
+    if (useLetterheadImage) {
+      // Real AWC letterhead artwork as a page-1 background image,
+      // the same technique as Hugo's own Word letters.
+      try {
+        options.letterheadImage = { data: await fetchBytes('assets/awc-letterhead.jpg'), ext: 'jpg' };
+      } catch (e) { /* fall back to no letterhead image */ }
+    } else if (includeLetterhead && selLetterhead.value !== 'none') {
       options.headerTitle = letterHeadTitle.textContent;
       options.headerSub = letterHeadSub.textContent;
       options.footerContact = `📧 ${footEmail.textContent}   |   📞 ${footPhone.textContent}   |   📍 ${footAddress.textContent}`;
+    }
+
+    // Signatures, copies and annexures (Letter Studio ending)
+    if (includeLetterhead) {
+      const sigs = getSelectedSignatories();
+      if (sigs.length) {
+        try {
+          options.signatures = await Promise.all(sigs.map(async s => ({
+            data: await fetchBytes(s.img),
+            ext: s.img.split('.').pop().toLowerCase(),
+            w: s.w, h: s.h,
+            org: AWC_ORG_LINE,
+            name: s.nameSi
+          })));
+        } catch (e) { /* signatures skipped if an image fails to load */ }
+      }
+      const copies = getCopiesLines();
+      if (copies.length) options.copies = copies;
+      if (annexures.length) {
+        options.annexures = annexures.map((a, i) => ({
+          data: dataUrlToBytes(a.dataUrl),
+          ext: a.ext, w: a.w, h: a.h,
+          heading: 'ඇමුණුම ' + String(i + 1).padStart(2, '0')
+        }));
+      }
     }
 
     const blob = window.DocxBuilder.buildDocx(text, options);
@@ -396,6 +565,33 @@
     a.click();
     URL.revokeObjectURL(url);
     showToast(`Downloaded .DOCX (12pt, Justified) with ${targetFont}!`, '📥');
+  }
+
+  // Signatures + copies as HTML for the .DOC export (images referenced
+  // by absolute URL, so Word must be online to fetch them; the native
+  // .DOCX export embeds the images properly).
+  function buildEndingHtmlForDoc(fontName) {
+    const assetBase = location.href.replace(/[^/]*$/, '');
+    const sigs = getSelectedSignatories();
+    let html = '';
+    if (sigs.length) {
+      const cells = sigs.map(s => `
+        <td style="width: 50%; vertical-align: bottom; padding: 18pt 12pt 0 0;">
+          <img src="${assetBase}${s.img}" style="max-height: 42pt; max-width: 160pt;"><br>
+          <span style="border-top: 2pt dotted #000; display: block; padding-top: 4pt; font-family: '${fontName}', sans-serif; font-size: 11.5pt;">${convertForLetter(AWC_ORG_LINE)}<br>${convertForLetter(s.nameSi)}</span>
+        </td>`);
+      let rows = '';
+      for (let i = 0; i < cells.length; i += 2) {
+        rows += `<tr>${cells[i]}${cells[i + 1] || '<td style="width: 50%;"></td>'}</tr>`;
+      }
+      html += `<table style="width: 100%; border-collapse: collapse;">${rows}</table>`;
+    }
+    const copies = getCopiesLines();
+    if (copies.length) {
+      html += `<p class="MsoNormal" style="margin-top: 18pt; font-weight: bold; font-family: '${fontName}', sans-serif; font-size: 12pt;">${convertForLetter('පිටපත්:')}</p>`;
+      html += copies.map((l, i) => `<p class="MsoNormal" style="font-family: '${fontName}', sans-serif; font-size: 12pt;">${i + 1}. ${convertForLetter(l)}</p>`).join('\n');
+    }
+    return html;
   }
 
   // Export to Word Document (.DOC fallback)
@@ -491,6 +687,7 @@
         <div class="Section1">
           ${headerHtml}
           ${paragraphsHtml}
+          ${includeLetterhead ? buildEndingHtmlForDoc(fontName) : ''}
           ${footerHtml}
         </div>
       </body>
@@ -509,13 +706,23 @@
 
   // Print Document (Direct A4 Print Layout)
   function printDocument(isLetterStudio = false) {
-    const printableElement = isLetterStudio ? document.getElementById('printableA4Page') : null;
+    const printableElement = isLetterStudio ? printableA4Page : null;
     const fontName = getSelectedFont(isLetterStudio);
-    const bodyContent = isLetterStudio && printableElement ? printableElement.innerHTML : `
+    const withLetterhead = isLetterStudio && selLetterhead.value === 'awc';
+    let bodyContent;
+    if (isLetterStudio && printableElement) {
+      // Make bundled asset images (letterhead, signatures) absolute so
+      // they resolve inside the print window; annexure data URLs are fine.
+      const assetBase = location.href.replace(/[^/]*$/, '');
+      bodyContent = printableElement.innerHTML.replace(/src="assets\//g, `src="${assetBase}assets/`);
+      bodyContent = `<div class="print-wrap ${withLetterhead ? 'with-letterhead' : ''}">${bodyContent}</div>`;
+    } else {
+      bodyContent = `
       <div style="white-space: pre-wrap; font-family: '${fontName}', sans-serif; font-size: 12pt; line-height: 1.6; text-align: justify; text-justify: inter-word;">
         ${lastRichHtml ? lastRichHtml.replace(/\n/g, '<br>') : escapeHtml(outputText.value)}
       </div>
     `;
+    }
 
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
@@ -523,14 +730,32 @@
         <head>
           <title>Formal Letter Print</title>
           <style>
-            @page { size: A4; margin: 1.5cm; }
+            @page { size: A4; margin: ${isLetterStudio ? '0' : '1.5cm'}; }
             body { font-family: '${fontName}', sans-serif; padding: 0; margin: 0; background: #fff; color: #000; text-align: justify; text-justify: inter-word; }
             .en-text { font-family: Arial, Helvetica, sans-serif !important; font-weight: normal; }
+            .print-wrap { position: relative; padding: 18mm 20mm; box-sizing: border-box; }
+            .print-wrap.with-letterhead { padding: 54mm 20mm 24mm 20mm; }
+            .letterhead-bg { display: none; }
+            .print-wrap.with-letterhead .letterhead-bg { display: block; position: absolute; top: 0; left: 0; width: 210mm; height: 297mm; z-index: 0; }
+            .print-wrap > *:not(.letterhead-bg) { position: relative; z-index: 1; }
             .letter-header-banner { text-align: center; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 25px; }
             .letter-logo-title { font-family: Arial, sans-serif; font-size: 16pt; font-weight: bold; }
             .letter-logo-subtitle { font-family: Arial, sans-serif; font-size: 9pt; color: #555; }
             .letter-body-content { font-size: 12pt; line-height: 1.6; font-family: '${fontName}', sans-serif; text-align: justify; text-justify: inter-word; }
             .letter-footer-banner { border-top: 2px solid #999; margin-top: 40px; padding-top: 10px; font-family: Arial, sans-serif; font-size: 9pt; display: flex; justify-content: space-between; }
+            .letter-signatures { margin-top: 10mm; }
+            .sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm 14mm; }
+            .sig-cell { text-align: left; break-inside: avoid; page-break-inside: avoid; }
+            .sig-img-wrap { height: 15mm; display: flex; align-items: flex-end; }
+            .sig-img { max-height: 15mm; max-width: 78%; }
+            .sig-line { border-bottom: 2px dotted #000; margin: 1mm 0 2mm 0; }
+            .sig-org, .sig-name { font-size: 11.5pt; line-height: 1.35; text-align: left; }
+            .letter-copies { margin-top: 8mm; font-size: 12pt; }
+            .copies-heading { font-weight: bold; margin-bottom: 1mm; text-align: left; }
+            .copies-line { text-align: left; line-height: 1.4; }
+            .annex-page { page-break-before: always; break-before: page; text-align: center; padding-top: 6mm; }
+            .annex-heading { font-weight: bold; text-align: left; font-size: 12.5pt; margin-bottom: 5mm; }
+            .annex-img { max-width: 170mm; max-height: 235mm; }
           </style>
         </head>
         <body>
@@ -540,7 +765,7 @@
     `);
     printWindow.document.close();
     printWindow.focus();
-    setTimeout(() => printWindow.print(), 250);
+    setTimeout(() => printWindow.print(), 400);
   }
 
   function escapeHtml(str) {
@@ -698,6 +923,34 @@
   viewBtnLetter.addEventListener('click', () => setView('letter'));
 
   selLetterhead.addEventListener('change', updateLetterheadDesign);
+
+  copiesText.addEventListener('input', updateLetterEnding);
+
+  annexInput.addEventListener('change', () => {
+    const files = Array.from(annexInput.files || []);
+    files.forEach(file => {
+      if (!file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          annexures.push({
+            name: file.name,
+            dataUrl: reader.result,
+            ext: (file.name.split('.').pop() || 'png').toLowerCase().replace('jpeg', 'jpg'),
+            w: img.naturalWidth,
+            h: img.naturalHeight
+          });
+          renderAnnexList();
+          updateLetterEnding();
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+    annexInput.value = '';
+  });
+
   selLetterFont.addEventListener('change', () => {
     const chosen = selLetterFont.value;
     fontSelect.value = chosen;
@@ -759,6 +1012,8 @@
   previewFontLabel.textContent = savedFont;
 
   setMode('u2fm'); // Default mode: Unicode -> 4u / FM
+  renderSigCheckboxes();
+  renderAnnexList();
   updateLetterheadDesign();
 
   // Load sample on start

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sinhala-font-studio-v5-fonts';
+const CACHE_NAME = 'sinhala-font-studio-v6-letterhead';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -17,7 +17,14 @@ const ASSETS_TO_CACHE = [
   './fonts/4u-Bindumathi.woff2',
   './fonts/FM-Malithi.woff2',
   './fonts/FM-Abhaya.woff2',
-  './fonts/IsiAbhaya.woff2'
+  './fonts/IsiAbhaya.woff2',
+  './assets/awc-letterhead.jpg',
+  './assets/signatures/gihan-dinushka.jpg',
+  './assets/signatures/chamith-nanayakkara.jpg',
+  './assets/signatures/thilini-gamage.jpg',
+  './assets/signatures/charuka-wickramasekara.png',
+  './assets/signatures/mihiri-siriwardena.png',
+  './assets/signatures/aravinda-fernando.jpg'
 ];
 
 self.addEventListener('install', (event) => {

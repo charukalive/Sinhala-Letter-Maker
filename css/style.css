@@ -747,6 +747,179 @@ textarea.editor-input::placeholder {
   gap: 0.4rem;
 }
 
+/* Real Letterhead Background Image (AWC) */
+.letterhead-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: auto;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.a4-page > *:not(.letterhead-bg) {
+  position: relative;
+  z-index: 1;
+}
+
+.a4-page.has-letterhead .letter-body-content {
+  padding-top: 26%;
+}
+
+.a4-page.has-letterhead .letter-signatures,
+.a4-page.has-letterhead .letter-copies {
+  padding-bottom: 0.5rem;
+}
+
+/* Letter Ending Panel (Signatures / Copies / Annexures controls) */
+.letter-ending-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  margin: 0.75rem 0;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color, rgba(148, 163, 184, 0.25));
+  border-radius: var(--radius-md);
+}
+
+.ending-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.sig-check-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem 0.75rem;
+}
+
+.sig-check-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.ending-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color, rgba(148, 163, 184, 0.35));
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+}
+
+.ending-file {
+  font-size: 0.85rem;
+  max-width: 100%;
+}
+
+.annex-list {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.annex-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.annex-remove {
+  border: none;
+  background: transparent;
+  color: #ef4444;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+/* Signatures Grid on the A4 Page */
+.letter-signatures {
+  padding: 0 2.5rem 0.5rem 2.5rem;
+}
+
+.sig-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem 2.5rem;
+}
+
+.sig-cell {
+  text-align: left;
+  break-inside: avoid;
+}
+
+.sig-img-wrap {
+  height: 56px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.sig-img {
+  max-height: 56px;
+  max-width: 78%;
+}
+
+.sig-line {
+  border-bottom: 2px dotted #334155;
+  margin: 2px 0 6px 0;
+}
+
+.sig-org,
+.sig-name {
+  font-size: 11.5pt;
+  line-height: 1.35;
+  text-align: left;
+}
+
+/* Copies on the A4 Page */
+.letter-copies {
+  padding: 0.75rem 2.5rem 1.25rem 2.5rem;
+  font-size: 12pt;
+}
+
+.copies-heading {
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+  text-align: left;
+}
+
+.copies-line {
+  text-align: left;
+  line-height: 1.4;
+}
+
+/* Annexures on the A4 Page */
+.annex-page {
+  border-top: 2px dashed #cbd5e1;
+  padding: 1.75rem 2.5rem;
+  text-align: center;
+}
+
+.annex-heading {
+  font-weight: 700;
+  text-align: left;
+  font-size: 12.5pt;
+  margin-bottom: 1rem;
+}
+
+.annex-img {
+  max-width: 100%;
+  max-height: 900px;
+}
+
 /* Toast Notifications */
 .toast-container {
   position: fixed;
