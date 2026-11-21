@@ -56,6 +56,13 @@
   // DOM Elements - Letter Ending (signatures / copies / annexures)
   const printableA4Page = document.getElementById('printableA4Page');
   const letterheadBg = document.getElementById('letterheadBg');
+  const letterheadHeader = document.getElementById('letterheadHeader');
+  const letterheadFooter = document.getElementById('letterheadFooter');
+  const btnZoomIn = document.getElementById('btnZoomIn');
+  const btnZoomOut = document.getElementById('btnZoomOut');
+  const btnZoomReset = document.getElementById('btnZoomReset');
+  const zoomValue = document.getElementById('zoomValue');
+  let previewZoom = 1;
   const letterSignatures = document.getElementById('letterSignatures');
   const letterCopies = document.getElementById('letterCopies');
   const letterAnnexures = document.getElementById('letterAnnexures');
@@ -483,8 +490,12 @@
   // Copy the whole letter (body + signatures + copies) with formatting
   async function copyLetterFormatted() {
     const assetBase = location.href.replace(/[^/]*$/, '');
-    const html = `<div style="font-family: '${getSelectedFont(true)}', Arial, sans-serif; font-size: 12pt;">` +
-      printableA4Page.innerHTML.replace(/src="assets\//g, `src="${assetBase}assets/`) + '</div>';
+    // For pasting, keep the in-flow header/footer parts and drop the
+    // print-only full-page background image.
+    const pageHtml = printableA4Page.innerHTML
+      .replace(/src="assets\//g, `src="${assetBase}assets/`)
+      .replace(/<img class="letterhead-bg"[^>]*>/g, '');
+    const html = `<div style="font-family: '${getSelectedFont(true)}', Arial, sans-serif; font-size: 12pt;">` + pageHtml + '</div>';
     try {
       const item = new ClipboardItem({
         'text/html': new Blob([html], { type: 'text/html' }),
@@ -504,9 +515,13 @@
       letterHeaderBanner.style.display = 'none';
       letterFooterBanner.style.display = 'none';
       letterheadBg.style.display = 'none';
+      letterheadHeader.style.display = 'none';
+      letterheadFooter.style.display = 'none';
       printableA4Page.classList.remove('has-letterhead');
     } else if (design === 'classic') {
       letterheadBg.style.display = 'none';
+      letterheadHeader.style.display = 'none';
+      letterheadFooter.style.display = 'none';
       printableA4Page.classList.remove('has-letterhead');
       letterHeaderBanner.style.display = 'block';
       letterFooterBanner.style.display = 'flex';
@@ -522,6 +537,8 @@
       letterHeaderBanner.style.display = 'none';
       letterFooterBanner.style.display = 'none';
       letterheadBg.style.display = 'block';
+      letterheadHeader.style.display = 'block';
+      letterheadFooter.style.display = 'block';
       printableA4Page.classList.add('has-letterhead');
       letterHeadTitle.textContent = 'ANIMAL WELFARE COALITION (AWC) - SRI LANKA';
       letterHeadSub.textContent = 'ANIMAL PROTECTION, REHABILITATION & ADVOCACY';
@@ -854,6 +871,9 @@
       // they resolve inside the print window; annexure data URLs are fine.
       const assetBase = location.href.replace(/[^/]*$/, '');
       bodyContent = printableElement.innerHTML.replace(/src="assets\//g, `src="${assetBase}assets/`);
+      // Print uses the full locked letterhead background, not the
+      // split header/footer parts used by the screen preview.
+      bodyContent = bodyContent.replace(/<img class="letterhead-part[^>]*>/g, '');
       bodyContent = `<div class="print-wrap ${withLetterhead ? 'with-letterhead' : ''}">${bodyContent}</div>`;
     } else {
       bodyContent = `
@@ -1063,6 +1083,15 @@
   viewBtnLetter.addEventListener('click', () => setView('letter'));
 
   selLetterhead.addEventListener('change', updateLetterheadDesign);
+
+  // Preview zoom controls
+  function applyPreviewZoom() {
+    printableA4Page.style.zoom = previewZoom;
+    zoomValue.textContent = Math.round(previewZoom * 100) + '%';
+  }
+  btnZoomIn.addEventListener('click', () => { previewZoom = Math.min(1.6, +(previewZoom + 0.1).toFixed(2)); applyPreviewZoom(); });
+  btnZoomOut.addEventListener('click', () => { previewZoom = Math.max(0.4, +(previewZoom - 0.1).toFixed(2)); applyPreviewZoom(); });
+  btnZoomReset.addEventListener('click', () => { previewZoom = 1; applyPreviewZoom(); });
 
   // Formatting toolbar: keep the letter selection when clicking buttons
   document.querySelectorAll('#formatToolbar [data-fmt]').forEach(btn => {

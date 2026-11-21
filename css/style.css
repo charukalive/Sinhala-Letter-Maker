@@ -747,7 +747,16 @@ textarea.editor-input::placeholder {
   gap: 0.4rem;
 }
 
-/* Real Letterhead Background Image (AWC) */
+/* Real Letterhead Background Image (AWC) — used by Print/PDF and
+   DOCX as the locked page-1 background. On screen the preview uses
+   the split header/footer parts instead, so the footer band never
+   lands in the middle of a long letter. */
+@media screen {
+  .letterhead-bg {
+    display: none !important;
+  }
+}
+
 .letterhead-bg {
   position: absolute;
   top: 0;
@@ -758,18 +767,39 @@ textarea.editor-input::placeholder {
   pointer-events: none;
 }
 
+.letterhead-part {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.letterhead-part-footer {
+  margin-top: auto;
+}
+
 .a4-page > *:not(.letterhead-bg) {
   position: relative;
   z-index: 1;
 }
 
-.a4-page.has-letterhead .letter-body-content {
-  padding-top: 26%;
+/* Preview zoom bar */
+.preview-zoom-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  justify-content: flex-end;
+  margin: 0.5rem 0 0 0;
 }
 
-.a4-page.has-letterhead .letter-signatures,
-.a4-page.has-letterhead .letter-copies {
-  padding-bottom: 0.5rem;
+.zoom-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.zoom-value {
+  font-size: 0.85rem;
+  min-width: 3rem;
+  text-align: center;
 }
 
 /* Formatting Toolbar */

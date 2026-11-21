@@ -293,12 +293,24 @@
         </div>
       </div>
 
+      <!-- Preview Zoom Controls -->
+      <div class="preview-zoom-bar">
+        <span class="zoom-label">🔍 Preview:</span>
+        <button class="fmt-btn" id="btnZoomOut" title="Zoom out">−</button>
+        <span class="zoom-value" id="zoomValue">100%</span>
+        <button class="fmt-btn" id="btnZoomIn" title="Zoom in">+</button>
+        <button class="fmt-btn fmt-wide" id="btnZoomReset">Reset</button>
+      </div>
+
       <!-- Formal A4 Paper Layout Preview -->
       <div class="paper-container">
         <div class="a4-page" id="printableA4Page">
 
-          <!-- Real AWC Letterhead Background (page 1) -->
+          <!-- Real AWC Letterhead Background (page 1, print/DOCX only) -->
           <img class="letterhead-bg" id="letterheadBg" src="assets/awc-letterhead.jpg" alt="" style="display: none;">
+
+          <!-- Letterhead header for the screen preview -->
+          <img class="letterhead-part" id="letterheadHeader" src="assets/awc-letterhead-header.jpg" alt="" style="display: none;">
 
           <!-- Letterhead Banner -->
           <div class="letter-header-banner" id="letterHeaderBanner">
@@ -317,6 +329,9 @@
 
           <!-- Copies (පිටපත්) -->
           <div class="letter-copies" id="letterCopies"></div>
+
+          <!-- Letterhead footer for the screen preview -->
+          <img class="letterhead-part letterhead-part-footer" id="letterheadFooter" src="assets/awc-letterhead-footer.jpg" alt="" style="display: none;">
 
           <!-- Formal Letter Footer Banner -->
           <div class="letter-footer-banner" id="letterFooterBanner">

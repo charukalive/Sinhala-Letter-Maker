@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sinhala-font-studio-v7-formatting';
+const CACHE_NAME = 'sinhala-font-studio-v8-preview';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -19,6 +19,8 @@ const ASSETS_TO_CACHE = [
   './fonts/FM-Abhaya.woff2',
   './fonts/IsiAbhaya.woff2',
   './assets/awc-letterhead.jpg',
+  './assets/awc-letterhead-header.jpg',
+  './assets/awc-letterhead-footer.jpg',
   './assets/signatures/gihan-dinushka.jpg',
   './assets/signatures/chamith-nanayakkara.jpg',
   './assets/signatures/thilini-gamage.jpg',
