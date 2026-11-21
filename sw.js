@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sinhala-font-studio-v20-linespacing';
+const CACHE_NAME = 'sinhala-font-studio-v21-paraspaces';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

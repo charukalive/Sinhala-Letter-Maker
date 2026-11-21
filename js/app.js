@@ -662,6 +662,113 @@
     showToast(`Removed ${markers.length} page break${markers.length > 1 ? 's' : ''}`, '🗑️');
   });
 
+  // Word-style paragraph spacing: "Add/Remove Space Before/After
+  // Paragraph". A space here is one blank line in the letter text,
+  // so the buttons add or remove the blank line next to the
+  // paragraph the cursor is in. They edit the source text itself,
+  // which keeps the preview, the sheets, Print/PDF and the DOCX in
+  // agreement — and Hugo's own blank lines are otherwise untouched.
+  const btnSpaceBefore = document.getElementById('btnSpaceBefore');
+  const btnSpaceAfter = document.getElementById('btnSpaceAfter');
+
+  // The rendered line the cursor is on, translated to a source-text
+  // line: page-break markers occupy a rendered line but have no
+  // line in the source, so they are counted and subtracted.
+  function caretLineInfo() {
+    const range = letterRange();
+    if (!range) return null;
+    const target = range.startContainer;
+    let line = 0, markers = 0, found = false;
+    const walker = document.createTreeWalker(letterBodyRendered, NodeFilter.SHOW_ALL);
+    let node;
+    while ((node = walker.nextNode())) {
+      if (node === target) { found = true; break; }
+      if (node.nodeType === 1 && node.tagName === 'BR') line++;
+      else if (node.nodeType === 1 && node.classList && node.classList.contains('page-break-marker')) markers++;
+    }
+    if (!found) return null;
+    return { srcLine: line - markers };
+  }
+
+  function sourceLinesAndSplit() {
+    const srcLines = inputText.value.split(/\r?\n/);
+    const marker = /^\s*(පිටපත්|ඇමිණුම්|ඇමුණුම|ඇමුණුම්|Copies\b|Annexures?\b|Annexure Index\b)/;
+    let split = srcLines.findIndex(l => marker.test(l));
+    if (split === -1) split = srcLines.length;
+    return { srcLines, split };
+  }
+
+  function paraSpaceState() {
+    const info = caretLineInfo();
+    if (!info || info.srcLine < 0) return null;
+    const { srcLines, split } = sourceLinesAndSplit();
+    const i = info.srcLine;
+    if (i >= split) return null; // cursor sits in the trailing sections
+    return {
+      i, srcLines,
+      blankBefore: i > 0 && srcLines[i - 1].trim() === '',
+      blankAfter: i + 1 < split && srcLines[i + 1].trim() === ''
+    };
+  }
+
+  function refreshParaSpaceLabels() {
+    const st = paraSpaceState();
+    btnSpaceBefore.textContent = st && st.blankBefore ? 'Remove space before' : 'Add space before';
+    btnSpaceAfter.textContent = st && st.blankAfter ? 'Remove space after' : 'Add space after';
+  }
+  document.addEventListener('selectionchange', refreshParaSpaceLabels);
+
+  function placeCaretAtSourceLine(srcIdx) {
+    let line = 0, markers = 0, targetNode = null;
+    const walker = document.createTreeWalker(letterBodyRendered, NodeFilter.SHOW_ALL);
+    let node;
+    while ((node = walker.nextNode())) {
+      if (node.nodeType === 1 && node.tagName === 'BR') { line++; continue; }
+      if (node.nodeType === 1 && node.classList && node.classList.contains('page-break-marker')) { markers++; continue; }
+      if (node.nodeType === 3 && line - markers === srcIdx &&
+          !(node.parentElement && node.parentElement.closest('.page-break-marker'))) {
+        targetNode = node;
+        break;
+      }
+    }
+    letterBodyRendered.focus();
+    const sel = window.getSelection();
+    const r = document.createRange();
+    if (targetNode) r.setStart(targetNode, 0);
+    else { r.selectNodeContents(letterBodyRendered); r.collapse(false); }
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    savedLetterRange = r.cloneRange();
+  }
+
+  function applyParaSpace(which) {
+    const st = paraSpaceState();
+    if (!st) {
+      showToast('Tap in the letter first, in the paragraph to change', 'ℹ️');
+      return;
+    }
+    const { i, srcLines } = st;
+    let newLine = i;
+    if (which === 'before') {
+      if (st.blankBefore) { srcLines.splice(i - 1, 1); newLine = i - 1; }
+      else { srcLines.splice(i, 0, ''); newLine = i + 1; }
+    } else {
+      if (st.blankAfter) srcLines.splice(i + 1, 1);
+      else srcLines.splice(i + 1, 0, '');
+    }
+    inputText.value = srcLines.join('\n');
+    updateLetterStudio();
+    placeCaretAtSourceLine(newLine);
+    refreshParaSpaceLabels();
+    if (previewView === 'exact') buildExactPreview();
+    showToast(which === 'before'
+      ? (st.blankBefore ? 'Space before paragraph removed' : 'Space added before paragraph')
+      : (st.blankAfter ? 'Space after paragraph removed' : 'Space added after paragraph'), '↕');
+  }
+  btnSpaceBefore.addEventListener('click', () => applyParaSpace('before'));
+  btnSpaceAfter.addEventListener('click', () => applyParaSpace('after'));
+
   // Tap a page-break bar to remove that break (and one of the line
   // breaks inserted with it, so the text rejoins cleanly).
   letterBodyRendered.addEventListener('click', (e) => {
