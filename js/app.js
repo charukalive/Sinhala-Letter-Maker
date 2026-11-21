@@ -419,13 +419,18 @@
     const breakAnchors = getPageBreakAnchors(letterBodyRendered);
 
     const { mainText, trailingText } = splitTrailingSections(val);
+    // Like Word's "Remove Space Before/After Paragraph": blank lines
+    // in the source must not leave a blank-line gap in the letter —
+    // paragraphs follow each other at normal line spacing. (The
+    // input text itself is left untouched.)
+    const stripBlankLines = (t) => t.split(/\r?\n/).filter(l => l.trim() !== '').join('\n');
     const fam = fontChoice === 'unicode'
       ? "'Iskoola Potha', 'Noto Sans Sinhala', sans-serif"
       : `'${fontChoice}', sans-serif`;
     letterBodyRendered.style.fontFamily = fam;
     letterTrailing.style.fontFamily = fam;
-    letterBodyRendered.innerHTML = renderTextToHtml(mainText);
-    letterTrailing.innerHTML = trailingText.trim() ? renderTextToHtml(trailingText) : '';
+    letterBodyRendered.innerHTML = renderTextToHtml(stripBlankLines(mainText));
+    letterTrailing.innerHTML = trailingText.trim() ? renderTextToHtml(stripBlankLines(trailingText)) : '';
     breakAnchors.forEach(a => restorePageBreak(a));
 
     updateEnglishHighlight();
@@ -440,6 +445,24 @@
     const isIsi = (fontChoice === 'IsiAbhaya');
     const convertFn = isIsi ? unicodeToIsi : unicodeToFM;
     return window.MixedFontFormatter.convertWithPreservation(unicodeText, isIsi ? 'isi' : 'fm', convertFn, fontChoice).richHtml;
+  }
+
+  // Copies / annexure-index lines: EVERY space and every symbol or
+  // Latin token is English (Arial) — only actual Sinhala words use
+  // the legacy font. (The general converter keeps the spaces inside
+  // Sinhala runs in the legacy font, which Hugo does not want here.)
+  function convertSectionLine(text) {
+    const fontChoice = selLetterFont.value;
+    if (fontChoice === 'unicode') return escapeHtml(text);
+    const isIsi = (fontChoice === 'IsiAbhaya');
+    const convertFn = isIsi ? unicodeToIsi : unicodeToFM;
+    return text.split(/(\s+)/).map(part => {
+      if (!part) return '';
+      if (/^\s+$/.test(part) || !/[\u0D80-\u0DFF]/.test(part)) {
+        return `<span class="en-text">${escapeHtml(part)}</span>`;
+      }
+      return window.MixedFontFormatter.convertWithPreservation(part, isIsi ? 'isi' : 'fm', convertFn, fontChoice).richHtml;
+    }).join('');
   }
 
   function letterFontFamily() {
@@ -477,13 +500,13 @@
     const copies = getCopiesLines();
     letterCopies.style.fontFamily = letterFontFamily();
     letterCopies.innerHTML = copies.length
-      ? `<div class="copies-heading">${convertForLetter('පිටපත්:')}</div>` + copies.map((l, i) => `<div class="copies-line">${i + 1}. ${convertForLetter(l)}</div>`).join('')
+      ? `<div class="copies-heading">${convertForLetter('පිටපත්:')}</div>` + copies.map((l, i) => `<div class="copies-line"><span class="en-text">${i + 1}. </span>${convertSectionLine(l)}</div>`).join('')
       : '';
 
     const annexIndexLines = annexIndexText.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
     letterAnnexIndex.style.fontFamily = letterFontFamily();
     letterAnnexIndex.innerHTML = annexIndexLines.length
-      ? `<div class="copies-heading">${convertForLetter('ඇමිණුම්:')}</div>` + annexIndexLines.map((l, i) => `<div class="copies-line">${i + 1}. ${convertForLetter(l)}</div>`).join('')
+      ? `<div class="copies-heading">${convertForLetter('ඇමිණුම්:')}</div>` + annexIndexLines.map((l, i) => `<div class="copies-line"><span class="en-text">${i + 1}. </span>${convertSectionLine(l)}</div>`).join('')
       : '';
 
     letterAnnexures.style.fontFamily = letterFontFamily();
@@ -1139,12 +1162,12 @@
     const copies = getCopiesLines();
     if (copies.length) {
       html += `<p class="MsoNormal" style="margin-top: 18pt; font-weight: bold; font-family: '${fontName}', sans-serif; font-size: 12pt;">${convertForLetter('පිටපත්:')}</p>`;
-      html += copies.map((l, i) => `<p class="MsoNormal" style="font-family: '${fontName}', sans-serif; font-size: 12pt;">${i + 1}. ${convertForLetter(l)}</p>`).join('\n');
+      html += copies.map((l, i) => `<p class="MsoNormal" style="font-family: '${fontName}', sans-serif; font-size: 12pt;"><span class="en-text">${i + 1}. </span>${convertSectionLine(l)}</p>`).join('\n');
     }
     const annexIndexLines = annexIndexText.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
     if (annexIndexLines.length) {
       html += `<p class="MsoNormal" style="margin-top: 18pt; font-weight: bold; font-family: '${fontName}', sans-serif; font-size: 12pt;">${convertForLetter('ඇමිණුම්:')}</p>`;
-      html += annexIndexLines.map((l, i) => `<p class="MsoNormal" style="font-family: '${fontName}', sans-serif; font-size: 12pt;">${i + 1}. ${convertForLetter(l)}</p>`).join('\n');
+      html += annexIndexLines.map((l, i) => `<p class="MsoNormal" style="font-family: '${fontName}', sans-serif; font-size: 12pt;"><span class="en-text">${i + 1}. </span>${convertSectionLine(l)}</p>`).join('\n');
     }
     return html;
   }

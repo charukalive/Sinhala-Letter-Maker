@@ -244,10 +244,20 @@
     // Runs for a short line (signatory names, copies, headings), using the
     // same dual-font tokenisation as the body. Uses latinTokenRegex,
     // convertSinhalaFn, targetFont and szVal from the enclosing scope.
-    function textRunsXml(text, bold = false) {
+    function textRunsXml(text, bold = false, englishSpaces = false) {
       const bTag = bold ? '<w:b/>' : '';
       const mkRun = (t, font) => `<w:r><w:rPr><w:rFonts w:ascii="${escapeXml(font)}" w:hAnsi="${escapeXml(font)}" w:cs="${escapeXml(font)}"/>${bTag}<w:sz w:val="${szVal}"/><w:szCs w:val="${szVal}"/></w:rPr><w:t xml:space="preserve">${escapeXml(t)}</w:t></w:r>`;
       if (!text) return mkRun('', targetFont);
+      // Copies / annexure lines: every space and every non-Sinhala
+      // token is an Arial run; only Sinhala words use the legacy font.
+      if (englishSpaces && preserveEnglish) {
+        return text.split(/(\s+)/).map(part => {
+          if (!part) return '';
+          if (/^\s+$/.test(part)) return mkRun(' ', 'Arial');
+          if (!/[\u0D80-\u0DFF]/.test(part)) return mkRun(part, 'Arial');
+          return textRunsXml(part, bold, false);
+        }).join('');
+      }
       if (!preserveEnglish) {
         return mkRun(convertSinhalaFn ? convertSinhalaFn(text) : text, targetFont);
       }
@@ -402,7 +412,7 @@
     if (copies.length) {
       bodyXml += `<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="360" w:after="60"/></w:pPr>${textRunsXml('පිටපත්:', true)}</w:p>`;
       copies.forEach((line, i) => {
-        bodyXml += `<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0"/></w:pPr>${textRunsXml(`${i + 1}. ${line}`)}</w:p>`;
+        bodyXml += `<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0"/></w:pPr>${textRunsXml(`${i + 1}. ${line}`, false, true)}</w:p>`;
       });
     }
 
@@ -410,7 +420,7 @@
     if (annexIndex.length) {
       bodyXml += `<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="360" w:after="60"/></w:pPr>${textRunsXml('ඇමිණුම්:', true)}</w:p>`;
       annexIndex.forEach((line, i) => {
-        bodyXml += `<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0"/></w:pPr>${textRunsXml(`${i + 1}. ${line}`)}</w:p>`;
+        bodyXml += `<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0"/></w:pPr>${textRunsXml(`${i + 1}. ${line}`, false, true)}</w:p>`;
       });
     }
 
