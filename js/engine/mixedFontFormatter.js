@@ -37,11 +37,13 @@
     return parts;
   }
 
-  function convertWithPreservation(text, targetType = 'fm', convertSinhalaFn) {
+  function convertWithPreservation(text, targetType = 'fm', convertSinhalaFn, selectedFontName) {
     if (!text) return { plainText: '', richHtml: '', englishTokens: [] };
 
     const parts = tokenizeText(text);
-    const fontName = targetType === 'isi' ? 'IsiAbhaya, Isi, sans-serif' : '4u-Bindumathi, FM-Malithi, FM-Abhaya, sans-serif';
+    const fontName = selectedFontName
+      ? `'${selectedFontName}', sans-serif`
+      : (targetType === 'isi' ? 'IsiAbhaya, Isi, sans-serif' : '4u-Bindumathi, FM-Malithi, FM-Abhaya, sans-serif');
     const enFontName = 'Arial, Helvetica, sans-serif';
 
     let plainText = '';
