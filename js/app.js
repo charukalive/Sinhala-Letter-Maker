@@ -65,7 +65,12 @@
   let previewZoom = 1;
   const letterSignatures = document.getElementById('letterSignatures');
   const letterCopies = document.getElementById('letterCopies');
+  const letterTrailing = document.getElementById('letterTrailing');
   const letterAnnexures = document.getElementById('letterAnnexures');
+  const exactPreview = document.getElementById('exactPreview');
+  const btnViewEdit = document.getElementById('btnViewEdit');
+  const btnViewExact = document.getElementById('btnViewExact');
+  let previewView = 'edit'; // 'edit' | 'exact'
   const sigCheckboxes = document.getElementById('sigCheckboxes');
   const copiesText = document.getElementById('copiesText');
   const annexInput = document.getElementById('annexInput');
@@ -315,24 +320,42 @@
     updateLetterStudio();
   }
 
+  // Split a typed copies / annexure-index section off the end of the
+  // letter body, so it can be placed AFTER the signature grid (the
+  // official order: body -> signatures -> copies -> annexure index).
+  function splitTrailingSections(text) {
+    const lines = (text || '').split(/\r?\n/);
+    const marker = /^\s*(පිටපත්|ඇමිණුම්|ඇමුණුම|ඇමුණුම්|Copies\b|Annexures?\b|Annexure Index\b)/;
+    const idx = lines.findIndex(l => marker.test(l));
+    if (idx === -1) return { mainText: text, trailingText: '' };
+    return {
+      mainText: lines.slice(0, idx).join('\n').replace(/\s+$/, ''),
+      trailingText: lines.slice(idx).join('\n')
+    };
+  }
+
+  function renderTextToHtml(text) {
+    const fontChoice = selLetterFont.value;
+    if (fontChoice === 'unicode') return escapeHtml(text).replace(/\n/g, '<br>');
+    const isIsi = (fontChoice === 'IsiAbhaya');
+    const convertFn = isIsi ? unicodeToIsi : unicodeToFM;
+    return window.MixedFontFormatter.convertWithPreservation(text, isIsi ? 'isi' : 'fm', convertFn, fontChoice).richHtml.replace(/\n/g, '<br>');
+  }
+
   // Update Letter Studio Layout
   function updateLetterStudio() {
     const val = inputText.value || sampleComplaintLetter;
     const fontChoice = selLetterFont.value; // '4u-Bindumathi', 'FM-Malithi', 'FM-Abhaya', 'IsiAbhaya', 'unicode'
-    
-    let richContent = '';
-    if (fontChoice === 'unicode') {
-      richContent = escapeHtml(val).replace(/\n/g, '<br>');
-      letterBodyRendered.style.fontFamily = "'Iskoola Potha', 'Noto Sans Sinhala', sans-serif";
-    } else {
-      const isIsi = (fontChoice === 'IsiAbhaya');
-      const convertFn = isIsi ? unicodeToIsi : unicodeToFM;
-      const res = window.MixedFontFormatter.convertWithPreservation(val, isIsi ? 'isi' : 'fm', convertFn, fontChoice);
-      richContent = res.richHtml.replace(/\n/g, '<br>');
-      letterBodyRendered.style.fontFamily = `'${fontChoice}', sans-serif`;
-    }
 
-    letterBodyRendered.innerHTML = richContent;
+    const { mainText, trailingText } = splitTrailingSections(val);
+    const fam = fontChoice === 'unicode'
+      ? "'Iskoola Potha', 'Noto Sans Sinhala', sans-serif"
+      : `'${fontChoice}', sans-serif`;
+    letterBodyRendered.style.fontFamily = fam;
+    letterTrailing.style.fontFamily = fam;
+    letterBodyRendered.innerHTML = renderTextToHtml(mainText);
+    letterTrailing.innerHTML = trailingText.trim() ? renderTextToHtml(trailingText) : '';
+
     updateEnglishHighlight();
     updateLetterEnding();
   }
@@ -391,6 +414,8 @@
         <div class="annex-heading">${convertForLetter('ඇමුණුම ' + String(i + 1).padStart(2, '0'))}</div>
         <img class="annex-img" src="${a.dataUrl}" alt="">
       </div>`).join('');
+
+    if (previewView === 'exact') buildExactPreview();
   }
 
   function renderSigCheckboxes() {
@@ -445,12 +470,14 @@
   function setLetterAlign(align) {
     letterAlign = align;
     letterBodyRendered.style.textAlign = align === 'both' ? 'justify' : align;
+    letterTrailing.style.textAlign = align === 'both' ? 'justify' : align;
+    if (previewView === 'exact') buildExactPreview();
   }
 
   // Extract the (possibly formatted) letter body as lines of segments
   // for the DOCX builder. Preview spans already hold legacy-font text;
   // any raw Unicode Sinhala (e.g. pasted in) is converted here.
-  function extractRichLines() {
+  function extractRichLines(rootEl = letterBodyRendered) {
     const fontChoice = selLetterFont.value;
     const isIsi = (fontChoice === 'IsiAbhaya');
     const convertFn = fontChoice === 'unicode' ? null : (isIsi ? unicodeToIsi : unicodeToFM);
@@ -482,9 +509,117 @@
         }
       });
     }
-    walk(letterBodyRendered, { bold: false, italic: false, underline: false, latin: false }, true);
+    walk(rootEl, { bold: false, italic: false, underline: false, latin: false }, true);
     flush();
     return lines;
+  }
+
+  // --- Exact A4 pagination engine ---
+  // Measures the rendered letter content and packs it into true A4
+  // sheets (794x1123 px = 210x297 mm). The same sheets drive the
+  // on-screen Exact Preview and the Print/PDF output, so what the
+  // user sees is exactly what prints: page 1 content can never run
+  // underneath the letterhead footer.
+  const SHEET = { w: 794, h: 1123, padX: 76, firstTop: 218, firstBottom: 1005, top: 70, bottom: 1053 };
+  let sheetMeasurer = null;
+
+  function collectLineHtml(el) {
+    const lines = [];
+    let cur = document.createElement('div');
+    const push = () => { lines.push(cur.innerHTML); cur = document.createElement('div'); };
+    Array.from(el.childNodes).forEach(node => {
+      if (node.nodeType === 1 && node.tagName === 'BR') push();
+      else cur.appendChild(node.cloneNode(true));
+    });
+    push();
+    return lines;
+  }
+
+  function measureSheetHtml(html) {
+    if (!sheetMeasurer) {
+      sheetMeasurer = document.createElement('div');
+      sheetMeasurer.style.cssText = 'position:absolute; visibility:hidden; left:-9999px; top:0; line-height:1.6; word-break:break-word; text-align:justify;';
+      document.body.appendChild(sheetMeasurer);
+    }
+    sheetMeasurer.style.width = (SHEET.w - SHEET.padX * 2) + 'px';
+    sheetMeasurer.style.fontFamily = letterFontFamily();
+    sheetMeasurer.style.fontSize = letterSizePt + 'pt';
+    sheetMeasurer.innerHTML = html;
+    return sheetMeasurer.offsetHeight;
+  }
+
+  function buildSheetData() {
+    const lineH = Math.ceil(letterSizePt * (96 / 72) * 1.6);
+    const units = [];
+    const addLines = (el) => {
+      if (!el || !el.innerHTML.trim()) return;
+      collectLineHtml(el).forEach(html => {
+        const wrapped = `<div class="sheet-line">${html || '&nbsp;'}</div>`;
+        units.push({ html: wrapped, h: html ? measureSheetHtml(wrapped) : lineH, kind: 'line' });
+      });
+    };
+    addLines(letterBodyRendered);
+    if (letterSignatures.innerHTML.trim()) {
+      const html = `<div class="sheet-block">${letterSignatures.innerHTML}</div>`;
+      units.push({ html, h: measureSheetHtml(html) + 10, kind: 'block' });
+    }
+    if (letterCopies.innerHTML.trim()) {
+      Array.from(letterCopies.children).forEach(ch => {
+        units.push({ html: ch.outerHTML, h: measureSheetHtml(ch.outerHTML), kind: 'line' });
+      });
+    }
+    addLines(letterTrailing);
+
+    const useLetterhead = selLetterhead.value === 'awc';
+    const sheets = [];
+    let cur = null;
+    const newSheet = () => {
+      const first = sheets.length === 0;
+      const top = (first && useLetterhead) ? SHEET.firstTop : SHEET.top;
+      const bottom = (first && useLetterhead) ? SHEET.firstBottom : SHEET.bottom;
+      cur = { top, avail: bottom - top, used: 0, units: [] };
+      sheets.push(cur);
+    };
+    newSheet();
+    for (const u of units) {
+      if (cur.units.length && cur.used + u.h > cur.avail) newSheet();
+      cur.units.push(u);
+      cur.used += u.h;
+    }
+    annexures.forEach((a, i) => {
+      const heading = convertForLetter('ඇමුණුම ' + String(i + 1).padStart(2, '0'));
+      const maxH = SHEET.bottom - SHEET.top - 70;
+      const scale = Math.min((SHEET.w - SHEET.padX * 2) / a.w, maxH / a.h, 1);
+      const wpx = Math.round(a.w * scale);
+      const hpx = Math.round(a.h * scale);
+      sheets.push({
+        top: SHEET.top, avail: SHEET.bottom - SHEET.top, used: 0,
+        units: [{ html: `<div class="annex-heading">${heading}</div><div style="text-align:center;"><img src="${a.dataUrl}" style="width:${wpx}px; height:${hpx}px;"></div>`, h: maxH, kind: 'block' }]
+      });
+    });
+    return sheets.map((s, idx) => ({ ...s, letterhead: idx === 0 && useLetterhead }));
+  }
+
+  function sheetContentStyle(topPx) {
+    return `top:${topPx}px; font-family:${letterFontFamily()}; font-size:${letterSizePt}pt; text-align:${letterAlign === 'both' ? 'justify' : letterAlign};`;
+  }
+
+  function buildExactPreview() {
+    const assetBase = location.href.replace(/[^/]*$/, '');
+    exactPreview.innerHTML = buildSheetData().map(s => `
+      <div class="a4-sheet">
+        ${s.letterhead ? `<img class="sheet-letterhead" src="${assetBase}assets/awc-letterhead.jpg" alt="">` : ''}
+        <div class="sheet-content" style="${sheetContentStyle(s.top)}">${s.units.map(u => u.html).join('')}</div>
+      </div>`).join('');
+  }
+
+  function setPreviewView(v) {
+    previewView = v;
+    btnViewEdit.classList.toggle('view-active', v === 'edit');
+    btnViewExact.classList.toggle('view-active', v === 'exact');
+    document.querySelector('.paper-container').style.display = v === 'edit' ? '' : 'none';
+    exactPreview.style.display = v === 'exact' ? '' : 'none';
+    if (v === 'exact') buildExactPreview();
   }
 
   // Copy the whole letter (body + signatures + copies) with formatting
@@ -647,6 +782,10 @@
     if (includeLetterhead) {
       options.richLines = extractRichLines();
       options.bodyAlign = letterAlign;
+      const trailing = extractRichLines(letterTrailing);
+      if (trailing.some(l => l.some(s => s.text && s.text.trim()))) {
+        options.trailingLines = trailing;
+      }
     }
 
     const useLetterheadImage = includeLetterhead && selLetterhead.value === 'awc';
@@ -866,15 +1005,25 @@
     const fontName = getSelectedFont(isLetterStudio);
     const withLetterhead = isLetterStudio && selLetterhead.value === 'awc';
     let bodyContent;
+    let usedSheets = false;
     if (isLetterStudio && printableElement) {
-      // Make bundled asset images (letterhead, signatures) absolute so
-      // they resolve inside the print window; annexure data URLs are fine.
+      // Exact paginated sheets: identical layout to the Exact Preview,
+      // so page 1 content can never run under the letterhead footer.
       const assetBase = location.href.replace(/[^/]*$/, '');
-      bodyContent = printableElement.innerHTML.replace(/src="assets\//g, `src="${assetBase}assets/`);
-      // Print uses the full locked letterhead background, not the
-      // split header/footer parts used by the screen preview.
-      bodyContent = bodyContent.replace(/<img class="letterhead-part[^>]*>/g, '');
-      bodyContent = `<div class="print-wrap ${withLetterhead ? 'with-letterhead' : ''}">${bodyContent}</div>`;
+      try {
+        const px2mm = (px) => Math.round(px * 0.26458 * 100) / 100;
+        bodyContent = buildSheetData().map(s => `
+          <div class="print-sheet">
+            ${s.letterhead ? `<img class="sheet-letterhead" src="${assetBase}assets/awc-letterhead.jpg">` : ''}
+            <div class="sheet-content" style="top:${px2mm(s.top)}mm; font-family:${letterFontFamily()}; font-size:${letterSizePt}pt; text-align:${letterAlign === 'both' ? 'justify' : letterAlign};">${s.units.map(u => u.html).join('')}</div>
+          </div>`).join('');
+        bodyContent = bodyContent.replace(/src="assets\//g, `src="${assetBase}assets/`);
+        usedSheets = true;
+      } catch (e) {
+        bodyContent = printableElement.innerHTML.replace(/src="assets\//g, `src="${assetBase}assets/`);
+        bodyContent = bodyContent.replace(/<img class="letterhead-part[^>]*>/g, '');
+        bodyContent = `<div class="print-wrap ${withLetterhead ? 'with-letterhead' : ''}">${bodyContent}</div>`;
+      }
     } else {
       bodyContent = `
       <div style="white-space: pre-wrap; font-family: '${fontName}', sans-serif; font-size: 12pt; line-height: 1.6; text-align: justify; text-justify: inter-word;">
@@ -893,6 +1042,12 @@
             @page { size: A4; margin: ${isLetterStudio ? '0' : '1.5cm'}; }
             body { font-family: '${fontName}', sans-serif; padding: 0; margin: 0; background: #fff; color: #000; text-align: justify; text-justify: inter-word; }
             .en-text { font-family: Arial, Helvetica, sans-serif !important; font-weight: normal; }
+            .print-sheet { position: relative; width: 210mm; height: 297mm; overflow: hidden; page-break-after: always; break-after: page; }
+            .print-sheet:last-child { page-break-after: auto; break-after: auto; }
+            .sheet-letterhead { position: absolute; top: 0; left: 0; width: 210mm; height: 297mm; }
+            .sheet-content { position: absolute; left: 20mm; right: 20mm; line-height: 1.6; word-break: break-word; }
+            .sheet-line { line-height: 1.6; min-height: 1.6em; }
+            .sheet-block { margin-top: 3mm; }
             .print-wrap { position: relative; padding: 18mm 20mm; box-sizing: border-box; }
             .print-wrap.with-letterhead { padding: 54mm 20mm 24mm 20mm; }
             .letterhead-bg { display: none; }
@@ -908,7 +1063,7 @@
             .sig-cell { text-align: left; break-inside: avoid; page-break-inside: avoid; }
             .sig-img-wrap { height: 15mm; display: flex; align-items: flex-end; }
             .sig-img { max-height: 15mm; max-width: 78%; }
-            .sig-line { border-bottom: 2px dotted #000; margin: 1mm 0 2mm 0; }
+            .sig-line { border-bottom: 1px dotted #999; width: 82%; margin: 1mm 0 2mm 0; }
             .sig-org, .sig-name { font-size: 11.5pt; line-height: 1.35; text-align: left; }
             .letter-copies { margin-top: 8mm; font-size: 12pt; }
             .copies-heading { font-weight: bold; margin-bottom: 1mm; text-align: left; }
@@ -1087,8 +1242,11 @@
   // Preview zoom controls
   function applyPreviewZoom() {
     printableA4Page.style.zoom = previewZoom;
+    exactPreview.style.zoom = previewZoom;
     zoomValue.textContent = Math.round(previewZoom * 100) + '%';
   }
+  btnViewEdit.addEventListener('click', () => setPreviewView('edit'));
+  btnViewExact.addEventListener('click', () => setPreviewView('exact'));
   btnZoomIn.addEventListener('click', () => { previewZoom = Math.min(1.6, +(previewZoom + 0.1).toFixed(2)); applyPreviewZoom(); });
   btnZoomOut.addEventListener('click', () => { previewZoom = Math.max(0.4, +(previewZoom - 0.1).toFixed(2)); applyPreviewZoom(); });
   btnZoomReset.addEventListener('click', () => { previewZoom = 1; applyPreviewZoom(); });
@@ -1104,6 +1262,8 @@
   selLetterSize.addEventListener('change', () => {
     letterSizePt = parseInt(selLetterSize.value, 10) || 12;
     letterBodyRendered.style.fontSize = letterSizePt + 'pt';
+    letterTrailing.style.fontSize = letterSizePt + 'pt';
+    if (previewView === 'exact') buildExactPreview();
   });
   btnCopyLetter.addEventListener('click', copyLetterFormatted);
 
@@ -1241,6 +1401,7 @@
   previewFontLabel.textContent = savedFont;
 
   setMode('u2fm'); // Default mode: Unicode -> 4u / FM
+  btnViewEdit.classList.add('view-active');
   loadCustomSignatures();
   renderSigCheckboxes();
   renderAnnexList();

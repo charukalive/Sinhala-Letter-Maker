@@ -295,12 +295,18 @@
 
       <!-- Preview Zoom Controls -->
       <div class="preview-zoom-bar">
+        <button class="fmt-btn fmt-wide" id="btnViewEdit">✏️ Edit view</button>
+        <button class="fmt-btn fmt-wide" id="btnViewExact">📄 Exact preview</button>
+        <span class="fmt-sep"></span>
         <span class="zoom-label">🔍 Preview:</span>
         <button class="fmt-btn" id="btnZoomOut" title="Zoom out">−</button>
         <span class="zoom-value" id="zoomValue">100%</span>
         <button class="fmt-btn" id="btnZoomIn" title="Zoom in">+</button>
         <button class="fmt-btn fmt-wide" id="btnZoomReset">Reset</button>
       </div>
+
+      <!-- Exact paginated A4 preview (same sheets the printer gets) -->
+      <div class="exact-preview" id="exactPreview" style="display: none;"></div>
 
       <!-- Formal A4 Paper Layout Preview -->
       <div class="paper-container">
@@ -329,6 +335,9 @@
 
           <!-- Copies (පිටපත්) -->
           <div class="letter-copies" id="letterCopies"></div>
+
+          <!-- Trailing sections lifted from the body (copies / annexure index typed in the letter) -->
+          <div class="letter-trailing" id="letterTrailing"></div>
 
           <!-- Letterhead footer for the screen preview -->
           <img class="letterhead-part letterhead-part-footer" id="letterheadFooter" src="assets/awc-letterhead-footer.jpg" alt="" style="display: none;">

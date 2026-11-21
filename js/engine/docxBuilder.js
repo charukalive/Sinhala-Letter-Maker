@@ -137,6 +137,7 @@
       convertSinhalaFn = null,
       fontSizePt = 12,
       richLines = null,
+      trailingLines = null,
       bodyAlign = 'both',
       letterheadImage = null,
       signatures = [],
@@ -299,22 +300,27 @@
     // Process lines: formatted (rich) lines from the Letter Studio, or
     // plain raw text lines when no rich content is supplied.
     const latinTokenRegex = /([A-Za-z0-9/&._-]*[A-Za-z][A-Za-z0-9/&._-]*(?:\s+[-–—]\s+[A-Za-z0-9/&._-]+|\s+[A-Za-z0-9/&._-]*[A-Za-z][A-Za-z0-9/&._-]*)*|[*•▪●○■◆◇►▸@#$%^&+=<>~_|\\\[\]{}]+)/g;
-    if (richLines) {
+    function richLinesToXml(linesArr) {
       const jc = ['left', 'center', 'right', 'both'].includes(bodyAlign) ? bodyAlign : 'both';
-      for (const segs of richLines) {
+      let out = '';
+      for (const segs of linesArr) {
         if (!segs || !segs.length || !segs.some(s => (s.text || '').length)) {
-          bodyXml += `<w:p><w:pPr><w:jc w:val="${jc}"/><w:spacing w:line="240" w:lineRule="auto" w:before="0" w:after="0"/></w:pPr></w:p>`;
+          out += `<w:p><w:pPr><w:jc w:val="${jc}"/><w:spacing w:line="240" w:lineRule="auto" w:before="0" w:after="0"/></w:pPr></w:p>`;
           continue;
         }
-        bodyXml += `<w:p><w:pPr><w:jc w:val="${jc}"/><w:spacing w:line="240" w:lineRule="auto" w:before="0" w:after="0"/></w:pPr>`;
+        out += `<w:p><w:pPr><w:jc w:val="${jc}"/><w:spacing w:line="240" w:lineRule="auto" w:before="0" w:after="0"/></w:pPr>`;
         for (const s of segs) {
           if (!s.text) continue;
           const font = s.latin ? 'Arial' : targetFont;
           const fmt = `${s.bold ? '<w:b/>' : ''}${s.italic ? '<w:i/>' : ''}${s.underline ? '<w:u w:val="single"/>' : ''}`;
-          bodyXml += `<w:r><w:rPr><w:rFonts w:ascii="${escapeXml(font)}" w:hAnsi="${escapeXml(font)}" w:cs="${escapeXml(font)}"/>${fmt}<w:sz w:val="${szVal}"/><w:szCs w:val="${szVal}"/></w:rPr><w:t xml:space="preserve">${escapeXml(s.text)}</w:t></w:r>`;
+          out += `<w:r><w:rPr><w:rFonts w:ascii="${escapeXml(font)}" w:hAnsi="${escapeXml(font)}" w:cs="${escapeXml(font)}"/>${fmt}<w:sz w:val="${szVal}"/><w:szCs w:val="${szVal}"/></w:rPr><w:t xml:space="preserve">${escapeXml(s.text)}</w:t></w:r>`;
         }
-        bodyXml += '</w:p>';
+        out += '</w:p>';
       }
+      return out;
+    }
+    if (richLines) {
+      bodyXml += richLinesToXml(richLines);
     } else {
     const lines = (rawText || '').split(/\r?\n/);
 
@@ -375,7 +381,7 @@
         }
         return `<w:tc><w:tcPr><w:tcW w:w="${cellW}" w:type="dxa"/><w:tcMar><w:right><w:w w="180" w:type="dxa"/></w:right></w:tcMar></w:tcPr>` +
           `<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0"/></w:pPr>${inlineImageXml(signatureRels[idx], cx, cy)}</w:p>` +
-          `<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="40" w:after="80"/><w:pBdr><w:bottom w:val="dotted" w:sz="12" w:space="1" w:color="000000"/></w:pBdr></w:pPr></w:p>` +
+          `<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="40" w:after="80"/><w:pBdr><w:bottom w:val="dotted" w:sz="6" w:space="1" w:color="595959"/></w:pBdr></w:pPr></w:p>` +
           `<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0"/></w:pPr>${textRunsXml(s.org || '')}</w:p>` +
           `<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0"/></w:pPr>${textRunsXml(s.name || '')}</w:p>` +
           `</w:tc>`;
@@ -393,6 +399,13 @@
       copies.forEach((line, i) => {
         bodyXml += `<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0"/></w:pPr>${textRunsXml(`${i + 1}. ${line}`)}</w:p>`;
       });
+    }
+
+    // Trailing sections (typed copies / annexure index) go after the
+    // signature grid and the copies list, in the official order.
+    if (trailingLines) {
+      bodyXml += '<w:p><w:pPr><w:spacing w:before="240" w:after="0"/></w:pPr></w:p>';
+      bodyXml += richLinesToXml(trailingLines);
     }
 
     if (footerContact) {
