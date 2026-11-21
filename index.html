@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="si" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Sinhala Font & Letter Studio (4u-Bindumathi • FM • Isi • Unicode)</title>
+  <meta name="description" content="Sinhala Unicode to 4u-Bindumathi, FM-Malithi, FM-Abhaya, and IsiAbhaya font converter with crisp English preservation, native .DOCX export, and mobile-friendly formal letterhead formatter.">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Sinhala Studio">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-icon">සි</div>
+        <div>
+          <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+            <span class="brand-title">Sinhala Font Studio</span>
+            <span class="brand-badge">4U • FM • ISI</span>
+          </div>
+          <div class="brand-subtitle">4u-Bindumathi • FM-Malithi • FM-Abhaya • IsiAbhaya</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="btnCheatSheet" class="btn-icon" title="Singlish Typing Guide & Rules" aria-label="Singlish Guide">
+          📖
+        </button>
+        <button id="btnThemeToggle" class="btn-icon" title="Toggle Light/Dark Theme" aria-label="Toggle Theme">
+          🌓
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main-wrapper">
+
+    <!-- Primary View Mode Switcher -->
+    <div class="view-mode-bar">
+      <div class="view-tabs">
+        <button id="viewBtnConverter" class="view-tab-btn active">
+          <span>⚡ Font Converter</span>
+        </button>
+        <button id="viewBtnLetter" class="view-tab-btn">
+          <span>📜 Formal Letter Studio</span>
+        </button>
+      </div>
+
+      <!-- Toggles Group -->
+      <div class="toggles-group">
+        <label class="toggle-item" title="Automatically detect English terms (e.g. LF-6345, TATA ACE) and preserve them in Arial font for Word/Print">
+          <input type="checkbox" id="chkPreserveEnglish" checked>
+          <span>🛡️ Preserve English in Arial</span>
+        </label>
+
+        <label class="toggle-item" title="Tick this if you want to visually highlight detected English terms in subtle blue">
+          <input type="checkbox" id="chkHighlightEnglish">
+          <span>🎨 Highlight English</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- =========================================
+         VIEW 1: QUICK CONVERTER WORKSPACE
+         ========================================= -->
+    <div id="converterView" style="display: flex; flex-direction: column; gap: 1.25rem;">
+      <!-- Converter Sub-Modes -->
+      <div class="mode-bar">
+        <div class="mode-tabs">
+          <button class="tab-btn active" data-mode="u2fm">
+            <span>Unicode ➔ 4u / FM</span>
+          </button>
+          <button class="tab-btn" data-mode="fm2u">
+            <span>4u / FM ➔ Unicode</span>
+          </button>
+          <button class="tab-btn" data-mode="u2isi">
+            <span>Unicode ➔ Isi</span>
+          </button>
+          <button class="tab-btn" data-mode="isi2u">
+            <span>Isi ➔ Unicode</span>
+          </button>
+          <button class="tab-btn" data-mode="singlish">
+            <span>Singlish ➔ All</span>
+          </button>
+        </div>
+
+        <button id="btnSwapMode" class="swap-btn" title="Swap input and output direction">
+          ⇄ Swap Direction
+        </button>
+      </div>
+
+      <!-- Panels Grid -->
+      <div class="panels-grid">
+
+        <!-- Input Panel -->
+        <section class="card-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span id="inputLabel">Unicode Text</span>
+              <span class="panel-tag" id="inputTag">Input</span>
+            </div>
+            <div class="panel-actions">
+              <button class="btn-tool" id="btnLoadComplaint" title="Load sample complaint letter with English terms (LF-6345, TATA ACE, AWC...)">Sample</button>
+              <button class="btn-tool" id="btnPaste" title="Paste from clipboard">Paste</button>
+              <button class="btn-tool" id="btnClear" title="Clear text area">Clear</button>
+            </div>
+          </div>
+          <div class="panel-body">
+            <textarea id="inputText" class="editor-input" placeholder="Type or paste your Sinhala Unicode text with English words (e.g. LF-6345, TATA ACE)..." spellcheck="false" autofocus></textarea>
+          </div>
+          <div class="panel-footer">
+            <div class="stats-group">
+              <span id="inCharCount">0 chars</span>
+              <span id="inWordCount">0 words</span>
+            </div>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">Real-time</span>
+          </div>
+        </section>
+
+        <!-- Output Panel -->
+        <section class="card-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span id="outputLabel">4u-Bindumathi Text</span>
+              <span class="panel-tag" id="outputTag">Output</span>
+            </div>
+            <div class="panel-actions">
+              <button class="btn-tool btn-primary-action" id="btnCopy" title="Copy converted plain text">
+                📋 Copy
+              </button>
+              <button class="btn-tool btn-accent" id="btnCopyWord" title="Copy dual-formatted text for MS Word">
+                📝 For Word
+              </button>
+              <button class="btn-tool btn-primary-action" id="btnExportDocx" title="Download native .DOCX file with selected font for Sinhala and Arial for English">
+                📥 .DOCX
+              </button>
+              <button class="btn-tool" id="btnExportDoc" title="Download Word document (.doc)">
+                .DOC
+              </button>
+              <button class="btn-tool" id="btnPrint" title="Print or save as PDF">
+                🖨️
+              </button>
+            </div>
+          </div>
+          <div class="panel-body">
+            <textarea id="outputText" class="editor-input" placeholder="Converted result will appear here..." readonly spellcheck="false"></textarea>
+          </div>
+          <div class="panel-footer">
+            <div class="stats-group">
+              <span id="outCharCount">0 chars</span>
+              <span id="outWordCount">0 words</span>
+            </div>
+            <div id="enDetectedBadge" class="english-badge-indicator" style="display: none;">
+              <span>0 English terms preserved</span>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Live WYSIWYG Font Visual Previewer -->
+      <section class="preview-card">
+        <div class="preview-header">
+          <div class="preview-title">
+            <span>👁️ Dual-Font Preview (<span id="previewFontLabel">4u-Bindumathi</span> + Arial)</span>
+            <span class="panel-tag">WYSIWYG</span>
+          </div>
+          <div class="preview-controls">
+            <div class="control-item">
+              <label for="fontSelect">Select Font:</label>
+              <select id="fontSelect" class="control-select">
+                <option value="4u-Bindumathi" selected>4u-Bindumathi (Default)</option>
+                <option value="FM-Malithi">FM-Malithi</option>
+                <option value="FM-Abhaya">FM-Abhaya</option>
+                <option value="IsiAbhaya">IsiAbhaya</option>
+                <option value="DL-Manel">DL-Manel</option>
+                <option value="Iskoola Potha">Unicode (Iskoola Potha)</option>
+                <option value="monospace">Monospace</option>
+              </select>
+            </div>
+            <div class="control-item">
+              <label for="fontSizeRange">Size:</label>
+              <input type="range" id="fontSizeRange" min="10" max="36" value="18" style="cursor: pointer;">
+              <span id="fontSizeVal">18px</span>
+            </div>
+          </div>
+        </div>
+        <div id="previewBox" class="preview-box">
+          Your rendered Sinhala text with English words will appear here in real-time.
+        </div>
+      </section>
+    </div>
+
+    <!-- =========================================
+         VIEW 2: FORMAL LETTER STUDIO (A4 LETTERHEAD)
+         ========================================= -->
+    <div id="letterStudioView" class="letter-studio-view">
+
+      <div class="letterhead-toolbar">
+        <div class="letterhead-options">
+          <div class="control-item">
+            <label for="selLetterhead">Letterhead:</label>
+            <select id="selLetterhead" class="control-select">
+              <option value="awc">Animal Welfare Coalition (AWC)</option>
+              <option value="classic">Classic Government / Corporate</option>
+              <option value="none">Plain Paper (No Banner)</option>
+            </select>
+          </div>
+          <div class="control-item">
+            <label for="selLetterFont">Font:</label>
+            <select id="selLetterFont" class="control-select">
+              <option value="4u-Bindumathi" selected>4u-Bindumathi (+ Arial for English)</option>
+              <option value="FM-Malithi">FM-Malithi (+ Arial for English)</option>
+              <option value="FM-Abhaya">FM-Abhaya (+ Arial for English)</option>
+              <option value="IsiAbhaya">IsiAbhaya (+ Arial for English)</option>
+              <option value="unicode">Modern Unicode (Iskoola Potha)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="panel-actions">
+          <button class="btn-tool btn-primary-action" id="btnLetterPrint">
+            🖨️ Print / PDF
+          </button>
+          <button class="btn-tool btn-accent" id="btnLetterDocx">
+            📥 Download .DOCX
+          </button>
+          <button class="btn-tool" id="btnLetterDoc">
+            .DOC
+          </button>
+        </div>
+      </div>
+
+      <!-- Formal A4 Paper Layout Preview -->
+      <div class="paper-container">
+        <div class="a4-page" id="printableA4Page">
+
+          <!-- Letterhead Banner -->
+          <div class="letter-header-banner" id="letterHeaderBanner">
+            <div class="letter-top-stripe"></div>
+            <div class="letter-logo-title" id="letterHeadTitle">ANIMAL WELFARE COALITION (AWC) - SRI LANKA</div>
+            <div class="letter-logo-subtitle" id="letterHeadSub">ANIMAL PROTECTION, REHABILITATION & ADVOCACY</div>
+          </div>
+
+          <!-- Letter Body Content Area -->
+          <div class="letter-body-content" id="letterBodyRendered">
+            <!-- Dynamic Content Injected Here -->
+          </div>
+
+          <!-- Formal Letter Footer Banner -->
+          <div class="letter-footer-banner" id="letterFooterBanner">
+            <div class="letter-footer-item">
+              <span>📧</span> <span id="footEmail">awcsrilanka@gmail.com</span>
+            </div>
+            <div class="letter-footer-item">
+              <span>📞</span> <span id="footPhone">+94 71 915 9992</span>
+            </div>
+            <div class="letter-footer-item">
+              <span>📍</span> <span id="footAddress">No 02 Edward Place, Kalubowila</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Singlish Cheat Sheet Modal -->
+  <div id="cheatModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div style="font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
+          <span>📖 Singlish Phonetic Typing Guide</span>
+        </div>
+        <button id="btnCloseModal" class="btn-icon" style="border: none;">✕</button>
+      </div>
+      <div class="modal-body">
+        <div>
+          <h4 style="margin-bottom: 0.6rem; color: var(--accent-secondary);">Vowels (ස්වර)</h4>
+          <div class="cheat-grid">
+            <div class="cheat-card"><span class="cheat-key">a</span><span class="cheat-val">අ</span></div>
+            <div class="cheat-card"><span class="cheat-key">aa / A</span><span class="cheat-val">ආ (ා)</span></div>
+            <div class="cheat-card"><span class="cheat-key">ae</span><span class="cheat-val">ඇ (ැ)</span></div>
+            <div class="cheat-card"><span class="cheat-key">aae</span><span class="cheat-val">ඈ (ෑ)</span></div>
+            <div class="cheat-card"><span class="cheat-key">i</span><span class="cheat-val">ඉ (ි)</span></div>
+            <div class="cheat-card"><span class="cheat-key">ee / ii / I</span><span class="cheat-val">ඊ (ී)</span></div>
+            <div class="cheat-card"><span class="cheat-key">u</span><span class="cheat-val">උ (ු)</span></div>
+            <div class="cheat-card"><span class="cheat-key">oo / uu / U</span><span class="cheat-val">ඌ (ූ)</span></div>
+            <div class="cheat-card"><span class="cheat-key">e</span><span class="cheat-val">එ (ෙ)</span></div>
+            <div class="cheat-card"><span class="cheat-key">ea / E</span><span class="cheat-val">ඒ (ේ)</span></div>
+            <div class="cheat-card"><span class="cheat-key">ai</span><span class="cheat-val">ඓ (ෛ)</span></div>
+            <div class="cheat-card"><span class="cheat-key">o</span><span class="cheat-val">ඔ (ො)</span></div>
+            <div class="cheat-card"><span class="cheat-key">oe / O</span><span class="cheat-val">ඕ (ෝ)</span></div>
+            <div class="cheat-card"><span class="cheat-key">au</span><span class="cheat-val">ඖ (ෞ)</span></div>
+          </div>
+        </div>
+
+        <div>
+          <h4 style="margin-bottom: 0.6rem; color: var(--accent-secondary);">Common Consonants (ව්‍යංජන)</h4>
+          <div class="cheat-grid">
+            <div class="cheat-card"><span class="cheat-key">k</span><span class="cheat-val">ක</span></div>
+            <div class="cheat-card"><span class="cheat-key">g</span><span class="cheat-val">ග</span></div>
+            <div class="cheat-card"><span class="cheat-key">ch</span><span class="cheat-val">ච</span></div>
+            <div class="cheat-card"><span class="cheat-key">j</span><span class="cheat-val">ජ</span></div>
+            <div class="cheat-card"><span class="cheat-key">t</span><span class="cheat-val">ට</span></div>
+            <div class="cheat-card"><span class="cheat-key">d</span><span class="cheat-val">ඩ</span></div>
+            <div class="cheat-card"><span class="cheat-key">th</span><span class="cheat-val">ත</span></div>
+            <div class="cheat-card"><span class="cheat-key">dh</span><span class="cheat-val">ද</span></div>
+            <div class="cheat-card"><span class="cheat-key">n</span><span class="cheat-val">න</span></div>
+            <div class="cheat-card"><span class="cheat-key">N</span><span class="cheat-val">ණ</span></div>
+            <div class="cheat-card"><span class="cheat-key">p</span><span class="cheat-val">ප</span></div>
+            <div class="cheat-card"><span class="cheat-key">b</span><span class="cheat-val">බ</span></div>
+            <div class="cheat-card"><span class="cheat-key">m</span><span class="cheat-val">ම</span></div>
+            <div class="cheat-card"><span class="cheat-key">y</span><span class="cheat-val">ය</span></div>
+            <div class="cheat-card"><span class="cheat-key">r</span><span class="cheat-val">ර</span></div>
+            <div class="cheat-card"><span class="cheat-key">l</span><span class="cheat-val">ල</span></div>
+            <div class="cheat-card"><span class="cheat-key">L</span><span class="cheat-val">ළ</span></div>
+            <div class="cheat-card"><span class="cheat-key">v / w</span><span class="cheat-val">ව</span></div>
+            <div class="cheat-card"><span class="cheat-key">s</span><span class="cheat-val">ස</span></div>
+            <div class="cheat-card"><span class="cheat-key">sh</span><span class="cheat-val">ශ</span></div>
+            <div class="cheat-card"><span class="cheat-key">Sh / shh</span><span class="cheat-val">ෂ</span></div>
+            <div class="cheat-card"><span class="cheat-key">h</span><span class="cheat-val">හ</span></div>
+            <div class="cheat-card"><span class="cheat-key">f</span><span class="cheat-val">ෆ</span></div>
+          </div>
+        </div>
+
+        <div>
+          <h4 style="margin-bottom: 0.6rem; color: var(--accent-secondary);">Special Combinations</h4>
+          <div class="cheat-grid">
+            <div class="cheat-card"><span class="cheat-key">sri / shree</span><span class="cheat-val">ශ්‍රී</span></div>
+            <div class="cheat-card"><span class="cheat-key">kra / tra</span><span class="cheat-val">ක්‍ර / ත්‍ර</span></div>
+            <div class="cheat-card"><span class="cheat-key">kya</span><span class="cheat-val">ක්‍ය</span></div>
+            <div class="cheat-card"><span class="cheat-key">ksha</span><span class="cheat-val">ක්‍ෂ</span></div>
+            <div class="cheat-card"><span class="cheat-key">nnd / nndh</span><span class="cheat-val">ඳ</span></div>
+            <div class="cheat-card"><span class="cheat-key">nng</span><span class="cheat-val">ඟ</span></div>
+            <div class="cheat-card"><span class="cheat-key">mmb</span><span class="cheat-val">ඹ</span></div>
+            <div class="cheat-card"><span class="cheat-key">gn / kn</span><span class="cheat-val">ඥ / ඤ</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div>Sinhala Font & Letter Studio • 4u-Bindumathi • FM-Malithi • FM-Abhaya • IsiAbhaya • 100% Mobile Ready</div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="js/engine/unicodeToFm.js"></script>
+  <script src="js/engine/fmToUnicode.js"></script>
+  <script src="js/engine/unicodeToIsi.js"></script>
+  <script src="js/engine/isiToUnicode.js"></script>
+  <script src="js/engine/singlishToUnicode.js"></script>
+  <script src="js/engine/mixedFontFormatter.js"></script>
+  <script src="js/engine/docxBuilder.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
