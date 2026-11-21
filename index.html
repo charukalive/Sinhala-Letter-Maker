@@ -287,7 +287,11 @@
           <textarea id="copiesText" class="ending-textarea" rows="4" placeholder="One copy recipient per line, e.g.&#10;ගරු ජනාධිපතිතුමා&#10;ගරු අග්‍රාමාත්‍යතුමිය"></textarea>
         </div>
         <div class="ending-group">
-          <div class="ending-title">📎 Annexures (ඇමිණුම්) — images</div>
+          <div class="ending-title">📎 Annexure index (ඇමිණුම්)</div>
+          <textarea id="annexIndexText" class="ending-textarea" rows="3" placeholder="One annexure per line, e.g.&#10;සිද්ධියට අදාළ ඡායාරූප&#10;අදාළ ලේඛන වාර්තාව (DMT Report)"></textarea>
+        </div>
+        <div class="ending-group">
+          <div class="ending-title">🖼️ Annexures (ඇමුණුම්) — images</div>
           <input type="file" id="annexInput" accept="image/*" multiple class="ending-file">
           <div class="annex-list" id="annexList"><span class="annex-empty">No annexures added</span></div>
         </div>
@@ -315,8 +319,6 @@
           <!-- Real AWC Letterhead Background (page 1, print/DOCX only) -->
           <img class="letterhead-bg" id="letterheadBg" src="assets/awc-letterhead.jpg" alt="" style="display: none;">
 
-          <!-- Letterhead header for the screen preview -->
-          <img class="letterhead-part" id="letterheadHeader" src="assets/awc-letterhead-header.jpg" alt="" style="display: none;">
 
           <!-- Letterhead Banner -->
           <div class="letter-header-banner" id="letterHeaderBanner">
@@ -336,11 +338,11 @@
           <!-- Copies (පිටපත්) -->
           <div class="letter-copies" id="letterCopies"></div>
 
+          <!-- Annexure index (ඇමිණුම්) -->
+          <div class="letter-copies" id="letterAnnexIndex"></div>
+
           <!-- Trailing sections lifted from the body (copies / annexure index typed in the letter) -->
           <div class="letter-trailing" id="letterTrailing"></div>
-
-          <!-- Letterhead footer for the screen preview -->
-          <img class="letterhead-part letterhead-part-footer" id="letterheadFooter" src="assets/awc-letterhead-footer.jpg" alt="" style="display: none;">
 
           <!-- Formal Letter Footer Banner -->
           <div class="letter-footer-banner" id="letterFooterBanner">

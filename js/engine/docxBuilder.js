@@ -142,6 +142,7 @@
       letterheadImage = null,
       signatures = [],
       copies = [],
+      annexIndex = [],
       annexures = []
     } = options;
 
@@ -397,6 +398,14 @@
     if (copies.length) {
       bodyXml += `<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="360" w:after="60"/></w:pPr>${textRunsXml('පිටපත්:', true)}</w:p>`;
       copies.forEach((line, i) => {
+        bodyXml += `<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0"/></w:pPr>${textRunsXml(`${i + 1}. ${line}`)}</w:p>`;
+      });
+    }
+
+    // Annexure index (ඇමිණුම්) list
+    if (annexIndex.length) {
+      bodyXml += `<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="360" w:after="60"/></w:pPr>${textRunsXml('ඇමිණුම්:', true)}</w:p>`;
+      annexIndex.forEach((line, i) => {
         bodyXml += `<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0"/></w:pPr>${textRunsXml(`${i + 1}. ${line}`)}</w:p>`;
       });
     }

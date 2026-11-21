@@ -1010,9 +1010,13 @@ textarea.editor-input::placeholder {
 }
 
 .sig-line {
-  border-bottom: 1px dotted #94a3b8;
-  width: 82%;
+  height: 2px;
+  width: 72%;
   margin: 2px 0 6px 0;
+  background-image: radial-gradient(circle, #b3becd 1px, transparent 1.4px);
+  background-size: 10px 2px;
+  background-repeat: repeat-x;
+  background-position: bottom left;
 }
 
 /* Trailing sections (copies / annexure index) on the A4 page */

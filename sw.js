@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sinhala-font-studio-v9-exact';
+const CACHE_NAME = 'sinhala-font-studio-v10-annexindex';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

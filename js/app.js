@@ -56,8 +56,6 @@
   // DOM Elements - Letter Ending (signatures / copies / annexures)
   const printableA4Page = document.getElementById('printableA4Page');
   const letterheadBg = document.getElementById('letterheadBg');
-  const letterheadHeader = document.getElementById('letterheadHeader');
-  const letterheadFooter = document.getElementById('letterheadFooter');
   const btnZoomIn = document.getElementById('btnZoomIn');
   const btnZoomOut = document.getElementById('btnZoomOut');
   const btnZoomReset = document.getElementById('btnZoomReset');
@@ -73,6 +71,8 @@
   let previewView = 'edit'; // 'edit' | 'exact'
   const sigCheckboxes = document.getElementById('sigCheckboxes');
   const copiesText = document.getElementById('copiesText');
+  const annexIndexText = document.getElementById('annexIndexText');
+  const letterAnnexIndex = document.getElementById('letterAnnexIndex');
   const annexInput = document.getElementById('annexInput');
   const annexList = document.getElementById('annexList');
 
@@ -408,6 +408,12 @@
       ? `<div class="copies-heading">${convertForLetter('පිටපත්:')}</div>` + copies.map((l, i) => `<div class="copies-line">${i + 1}. ${convertForLetter(l)}</div>`).join('')
       : '';
 
+    const annexIndexLines = annexIndexText.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    letterAnnexIndex.style.fontFamily = letterFontFamily();
+    letterAnnexIndex.innerHTML = annexIndexLines.length
+      ? `<div class="copies-heading">${convertForLetter('ඇමිණුම්:')}</div>` + annexIndexLines.map((l, i) => `<div class="copies-line">${i + 1}. ${convertForLetter(l)}</div>`).join('')
+      : '';
+
     letterAnnexures.style.fontFamily = letterFontFamily();
     letterAnnexures.innerHTML = annexures.map((a, i) => `
       <div class="annex-page">
@@ -568,6 +574,11 @@
         units.push({ html: ch.outerHTML, h: measureSheetHtml(ch.outerHTML), kind: 'line' });
       });
     }
+    if (letterAnnexIndex.innerHTML.trim()) {
+      Array.from(letterAnnexIndex.children).forEach(ch => {
+        units.push({ html: ch.outerHTML, h: measureSheetHtml(ch.outerHTML), kind: 'line' });
+      });
+    }
     addLines(letterTrailing);
 
     const useLetterhead = selLetterhead.value === 'awc';
@@ -608,7 +619,6 @@
     const assetBase = location.href.replace(/[^/]*$/, '');
     exactPreview.innerHTML = buildSheetData().map(s => `
       <div class="a4-sheet">
-        ${s.letterhead ? `<img class="sheet-letterhead" src="${assetBase}assets/awc-letterhead.jpg" alt="">` : ''}
         <div class="sheet-content" style="${sheetContentStyle(s.top)}">${s.units.map(u => u.html).join('')}</div>
       </div>`).join('');
   }
@@ -650,13 +660,9 @@
       letterHeaderBanner.style.display = 'none';
       letterFooterBanner.style.display = 'none';
       letterheadBg.style.display = 'none';
-      letterheadHeader.style.display = 'none';
-      letterheadFooter.style.display = 'none';
       printableA4Page.classList.remove('has-letterhead');
     } else if (design === 'classic') {
       letterheadBg.style.display = 'none';
-      letterheadHeader.style.display = 'none';
-      letterheadFooter.style.display = 'none';
       printableA4Page.classList.remove('has-letterhead');
       letterHeaderBanner.style.display = 'block';
       letterFooterBanner.style.display = 'flex';
@@ -672,8 +678,6 @@
       letterHeaderBanner.style.display = 'none';
       letterFooterBanner.style.display = 'none';
       letterheadBg.style.display = 'block';
-      letterheadHeader.style.display = 'block';
-      letterheadFooter.style.display = 'block';
       printableA4Page.classList.add('has-letterhead');
       letterHeadTitle.textContent = 'ANIMAL WELFARE COALITION (AWC) - SRI LANKA';
       letterHeadSub.textContent = 'ANIMAL PROTECTION, REHABILITATION & ADVOCACY';
@@ -817,6 +821,8 @@
       }
       const copies = getCopiesLines();
       if (copies.length) options.copies = copies;
+      const annexIndexLines = annexIndexText.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      if (annexIndexLines.length) options.annexIndex = annexIndexLines;
       if (annexures.length) {
         options.annexures = annexures.map((a, i) => ({
           data: dataUrlToBytes(a.dataUrl),
@@ -847,7 +853,7 @@
       const cells = sigs.map(s => `
         <td style="width: 50%; vertical-align: bottom; padding: 18pt 12pt 0 0;">
           <img src="${assetBase}${s.img}" style="max-height: 42pt; max-width: 160pt;"><br>
-          <span style="border-top: 2pt dotted #000; display: block; padding-top: 4pt; font-family: '${fontName}', sans-serif; font-size: 11.5pt;">${convertForLetter(AWC_ORG_LINE)}<br>${convertForLetter(s.nameSi)}</span>
+          <span style="border-top: 1pt dotted #999; display: block; padding-top: 4pt; font-family: '${fontName}', sans-serif; font-size: 11.5pt;">${convertForLetter(AWC_ORG_LINE)}<br>${convertForLetter(s.nameSi)}</span>
         </td>`);
       let rows = '';
       for (let i = 0; i < cells.length; i += 2) {
@@ -859,6 +865,11 @@
     if (copies.length) {
       html += `<p class="MsoNormal" style="margin-top: 18pt; font-weight: bold; font-family: '${fontName}', sans-serif; font-size: 12pt;">${convertForLetter('පිටපත්:')}</p>`;
       html += copies.map((l, i) => `<p class="MsoNormal" style="font-family: '${fontName}', sans-serif; font-size: 12pt;">${i + 1}. ${convertForLetter(l)}</p>`).join('\n');
+    }
+    const annexIndexLines = annexIndexText.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    if (annexIndexLines.length) {
+      html += `<p class="MsoNormal" style="margin-top: 18pt; font-weight: bold; font-family: '${fontName}', sans-serif; font-size: 12pt;">${convertForLetter('ඇමිණුම්:')}</p>`;
+      html += annexIndexLines.map((l, i) => `<p class="MsoNormal" style="font-family: '${fontName}', sans-serif; font-size: 12pt;">${i + 1}. ${convertForLetter(l)}</p>`).join('\n');
     }
     return html;
   }
@@ -1063,7 +1074,7 @@
             .sig-cell { text-align: left; break-inside: avoid; page-break-inside: avoid; }
             .sig-img-wrap { height: 15mm; display: flex; align-items: flex-end; }
             .sig-img { max-height: 15mm; max-width: 78%; }
-            .sig-line { border-bottom: 1px dotted #999; width: 82%; margin: 1mm 0 2mm 0; }
+            .sig-line { border-bottom: 1px dotted #bbb; width: 72%; margin: 1mm 0 2mm 0; }
             .sig-org, .sig-name { font-size: 11.5pt; line-height: 1.35; text-align: left; }
             .letter-copies { margin-top: 8mm; font-size: 12pt; }
             .copies-heading { font-weight: bold; margin-bottom: 1mm; text-align: left; }
@@ -1314,6 +1325,7 @@
   });
 
   copiesText.addEventListener('input', updateLetterEnding);
+  annexIndexText.addEventListener('input', updateLetterEnding);
 
   annexInput.addEventListener('change', () => {
     const files = Array.from(annexInput.files || []);
