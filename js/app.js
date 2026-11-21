@@ -206,7 +206,7 @@
       const convertFn = isIsi ? unicodeToIsi : unicodeToFM;
 
       if (preserveEnglish && window.MixedFontFormatter) {
-        const res = window.MixedFontFormatter.convertWithPreservation(val, targetType, convertFn);
+        const res = window.MixedFontFormatter.convertWithPreservation(val, targetType, convertFn, activeFont);
         plainResult = res.plainText;
         richHtml = res.richHtml;
         lastEnglishTokens = res.englishTokens;
@@ -267,7 +267,7 @@
     } else {
       const isIsi = (fontChoice === 'IsiAbhaya');
       const convertFn = isIsi ? unicodeToIsi : unicodeToFM;
-      const res = window.MixedFontFormatter.convertWithPreservation(val, isIsi ? 'isi' : 'fm', convertFn);
+      const res = window.MixedFontFormatter.convertWithPreservation(val, isIsi ? 'isi' : 'fm', convertFn, fontChoice);
       richContent = res.richHtml.replace(/\n/g, '<br>');
       letterBodyRendered.style.fontFamily = `'${fontChoice}', sans-serif`;
     }
@@ -731,6 +731,23 @@
     }
   });
 
+  // Embedded fonts: ask the browser to load each @font-face family
+  // (see css/style.css) and re-render once they are ready, so the
+  // preview does not stay on the fallback font on first load.
+  let embeddedFontsReady = false;
+  function loadEmbeddedFonts() {
+    if (!document.fonts || !document.fonts.load) { embeddedFontsReady = true; return; }
+    const families = ['4u-Bindumathi', 'FM-Malithi', 'FM-Abhaya', 'IsiAbhaya'];
+    Promise.all(families.map((name) => document.fonts.load(`16px "${name}"`).catch(() => [])))
+      .then(() => {
+        if (!embeddedFontsReady) {
+          embeddedFontsReady = true;
+          runConversion();
+        }
+      })
+      .catch(() => { embeddedFontsReady = true; });
+  }
+
   // Init
   const savedTheme = localStorage.getItem('sinhala_font_theme') || 'dark';
   document.documentElement.setAttribute('data-theme', savedTheme);
@@ -747,6 +764,7 @@
   // Load sample on start
   inputText.value = sampleComplaintLetter;
   runConversion();
+  loadEmbeddedFonts();
 
   // Register Service Worker
   if ('serviceWorker' in navigator) {
