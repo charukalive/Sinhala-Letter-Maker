@@ -419,18 +419,18 @@
     const breakAnchors = getPageBreakAnchors(letterBodyRendered);
 
     const { mainText, trailingText } = splitTrailingSections(val);
-    // Like Word's "Remove Space Before/After Paragraph": blank lines
-    // in the source must not leave a blank-line gap in the letter —
-    // paragraphs follow each other at normal line spacing. (The
-    // input text itself is left untouched.)
-    const stripBlankLines = (t) => t.split(/\r?\n/).filter(l => l.trim() !== '').join('\n');
+    // Spacing comes only from the source text itself: a blank line
+    // Hugo typed renders as exactly one blank line, and the app adds
+    // no paragraph spacing of its own (before/after are zero in the
+    // preview, the sheets and the DOCX, like Word with paragraph
+    // spacing removed).
     const fam = fontChoice === 'unicode'
       ? "'Iskoola Potha', 'Noto Sans Sinhala', sans-serif"
       : `'${fontChoice}', sans-serif`;
     letterBodyRendered.style.fontFamily = fam;
     letterTrailing.style.fontFamily = fam;
-    letterBodyRendered.innerHTML = renderTextToHtml(stripBlankLines(mainText));
-    letterTrailing.innerHTML = trailingText.trim() ? renderTextToHtml(stripBlankLines(trailingText)) : '';
+    letterBodyRendered.innerHTML = renderTextToHtml(mainText);
+    letterTrailing.innerHTML = trailingText.trim() ? renderTextToHtml(trailingText) : '';
     breakAnchors.forEach(a => restorePageBreak(a));
 
     updateEnglishHighlight();
