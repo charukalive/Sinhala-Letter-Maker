@@ -1,3 +1,64 @@
+/* ========================================================
+   EMBEDDED LEGACY SINHALA FONTS (@font-face)
+   Files live in ../fonts/ relative to this stylesheet (css/).
+   The family names below are exactly the names the app already
+   uses in JS (fontSelect / selLetterFont values), so the dual-font
+   preview and the A4 letter preview render in these fonts on any
+   device, even when the fonts are not installed locally.
+   Note: the FM-Malithi file was supplied as "A Malathi / DL-Malathi"
+   and is registered here under the app's 'FM-Malithi' name.
+   ======================================================== */
+@font-face {
+  font-family: '4u-Bindumathi';
+  src: url('../fonts/4u-Bindumathi.woff2') format('woff2'),
+       url('../fonts/4u-Bindumathi.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'FM-Malithi';
+  src: url('../fonts/FM-Malithi.woff2') format('woff2'),
+       url('../fonts/FM-Malithi.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'FM-Abhaya';
+  src: url('../fonts/FM-Abhaya.woff2') format('woff2'),
+       url('../fonts/FM-Abhaya.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IsiAbhaya';
+  src: url('../fonts/IsiAbhaya.woff2') format('woff2'),
+       url('../fonts/IsiAbhaya.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+/* Aliases matching the fonts' internal names, for any markup or
+   exported HTML that refers to them by those names. */
+@font-face {
+  font-family: 'FMBindumathi';
+  src: url('../fonts/4u-Bindumathi.woff2') format('woff2'),
+       url('../fonts/4u-Bindumathi.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'FMAbhaya';
+  src: url('../fonts/FM-Abhaya.woff2') format('woff2'),
+       url('../fonts/FM-Abhaya.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --bg-primary: #0f172a;
   --bg-secondary: #1e293b;
