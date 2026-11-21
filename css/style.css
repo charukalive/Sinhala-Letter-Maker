@@ -813,6 +813,12 @@ textarea.editor-input::placeholder {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color, rgba(148, 163, 184, 0.25));
   border-radius: var(--radius-md);
+  /* Sits directly above the A4 preview and stays pinned while the
+     letter is scrolled, so formatting is always within reach. */
+  position: sticky;
+  top: 6px;
+  z-index: 60;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
 }
 
 .format-label {

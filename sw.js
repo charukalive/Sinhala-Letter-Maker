@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sinhala-font-studio-v13-breakfix';
+const CACHE_NAME = 'sinhala-font-studio-v14-toolbar';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

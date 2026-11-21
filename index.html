@@ -243,32 +243,6 @@
         </div>
       </div>
 
-      <!-- Formatting Toolbar (doc-editor style) -->
-      <div class="format-toolbar" id="formatToolbar">
-        <span class="format-label">Format:</span>
-        <button class="fmt-btn" data-fmt="bold" title="Bold (select text in the letter first)"><b>B</b></button>
-        <button class="fmt-btn" data-fmt="italic" title="Italic"><i>I</i></button>
-        <button class="fmt-btn" data-fmt="underline" title="Underline"><u>U</u></button>
-        <button class="fmt-btn fmt-wide" id="btnPageBreak" title="Insert a page break at the cursor — following content starts on the next page">⤓ Page break</button>
-        <span class="fmt-sep"></span>
-        <button class="fmt-btn fmt-wide" data-align="left">Left</button>
-        <button class="fmt-btn fmt-wide" data-align="center">Center</button>
-        <button class="fmt-btn fmt-wide" data-align="right">Right</button>
-        <button class="fmt-btn fmt-wide" data-align="justify">Justify</button>
-        <span class="fmt-sep"></span>
-        <label class="format-size-label">Size:
-          <select id="selLetterSize" class="control-select">
-            <option value="11">11 pt</option>
-            <option value="12" selected>12 pt</option>
-            <option value="13">13 pt</option>
-            <option value="14">14 pt</option>
-          </select>
-        </label>
-        <span class="fmt-sep"></span>
-        <button class="fmt-btn fmt-wide" id="btnCopyLetter">📋 Copy Letter (formatted)</button>
-        <span class="format-hint">Select text in the letter below, then format it. You can also paste formatted text straight into the letter. 🔒 The AWC letterhead is locked as page 1.</span>
-      </div>
-
       <!-- Letter Ending: Signatures / Copies / Annexures -->
       <div class="letter-ending-panel">
         <div class="ending-group">
@@ -296,6 +270,32 @@
           <input type="file" id="annexInput" accept="image/*" multiple class="ending-file">
           <div class="annex-list" id="annexList"><span class="annex-empty">No annexures added</span></div>
         </div>
+      </div>
+
+      <!-- Formatting Toolbar (doc-editor style) -->
+      <div class="format-toolbar" id="formatToolbar">
+        <span class="format-label">Format:</span>
+        <button class="fmt-btn" data-fmt="bold" title="Bold (select text in the letter first)"><b>B</b></button>
+        <button class="fmt-btn" data-fmt="italic" title="Italic"><i>I</i></button>
+        <button class="fmt-btn" data-fmt="underline" title="Underline"><u>U</u></button>
+        <button class="fmt-btn fmt-wide" id="btnPageBreak" title="Insert a page break at the cursor — following content starts on the next page">⤓ Page break</button>
+        <span class="fmt-sep"></span>
+        <button class="fmt-btn fmt-wide" data-align="left">Left</button>
+        <button class="fmt-btn fmt-wide" data-align="center">Center</button>
+        <button class="fmt-btn fmt-wide" data-align="right">Right</button>
+        <button class="fmt-btn fmt-wide" data-align="justify">Justify</button>
+        <span class="fmt-sep"></span>
+        <label class="format-size-label">Size:
+          <select id="selLetterSize" class="control-select">
+            <option value="11">11 pt</option>
+            <option value="12" selected>12 pt</option>
+            <option value="13">13 pt</option>
+            <option value="14">14 pt</option>
+          </select>
+        </label>
+        <span class="fmt-sep"></span>
+        <button class="fmt-btn fmt-wide" id="btnCopyLetter">📋 Copy Letter (formatted)</button>
+        <span class="format-hint">Select text in the letter below, then format it. You can also paste formatted text straight into the letter. 🔒 The AWC letterhead is locked as page 1.</span>
       </div>
 
       <!-- Preview Zoom Controls -->
