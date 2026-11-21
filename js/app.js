@@ -42,6 +42,8 @@
   const selLetterFont = document.getElementById('selLetterFont');
   const selLangMode = document.getElementById('selLangMode');
   const btnShareDocx = document.getElementById('btnShareDocx');
+  const btnSharePdf = document.getElementById('btnSharePdf');
+  const docNameInput = document.getElementById('docName');
   const selTemplate = document.getElementById('selTemplate');
   const restoreFile = document.getElementById('restoreFile');
   const letterBodyRendered = document.getElementById('letterBodyRendered');
@@ -180,6 +182,31 @@
       } catch (e) { /* annexure images can exceed the quota — the letter text is still saved */ }
     }, 300);
   }
+  // ---- Export file name ----
+  // The name field sits beside the Print/Share buttons. Untouched,
+  // it defaults to "<21st November> Letter AWC" for today's date,
+  // and repeat exports of that default add (1), (2), … like Hugo
+  // asked. A name he types himself is used exactly as typed.
+  let docNameAuto = true;
+  function defaultDocName() {
+    const d = new Date();
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const day = d.getDate();
+    const ord = (day % 10 === 1 && day !== 11) ? 'st' : (day % 10 === 2 && day !== 12) ? 'nd' : (day % 10 === 3 && day !== 13) ? 'rd' : 'th';
+    return `${day}${ord} ${months[d.getMonth()]} Letter AWC`;
+  }
+  function currentExportName() {
+    const raw = (docNameInput.value || '').trim() || defaultDocName();
+    const clean = raw.replace(/[\\/:*?"<>|]/g, '').trim() || 'Letter';
+    if (!docNameAuto) return clean;
+    let counts = {};
+    try { counts = JSON.parse(localStorage.getItem('slm_name_counts') || '{}'); } catch (e) { /* ignore */ }
+    const n = counts[clean] || 0;
+    counts[clean] = n + 1;
+    try { localStorage.setItem('slm_name_counts', JSON.stringify(counts)); } catch (e) { /* ignore */ }
+    return n === 0 ? clean : `${clean} (${n})`;
+  }
+
   function currentSettings() {
     const sigTicks = {};
     SIGNATORIES.forEach(s => {
@@ -191,7 +218,8 @@
       size: letterSizePt, spacing: letterLineHeight, align: letterAlign,
       gaps: { sigs: gapBeforeSigs, copies: gapBeforeCopies, annex: gapBeforeAnnex },
       sigTicks,
-      contHeader: !!(document.getElementById('chkContHeader') || {}).checked
+      contHeader: !!(document.getElementById('chkContHeader') || {}).checked,
+      docName: docNameInput.value, docNameAuto
     };
   }
   function saveSettings() {
@@ -218,6 +246,8 @@
     }
     const cont = document.getElementById('chkContHeader');
     if (cont && typeof st.contHeader === 'boolean') cont.checked = st.contHeader;
+    if (typeof st.docNameAuto === 'boolean') docNameAuto = st.docNameAuto;
+    docNameInput.value = docNameAuto ? defaultDocName() : (st.docName || defaultDocName());
     letterBodyRendered.style.fontSize = letterSizePt + 'pt';
     letterTrailing.style.fontSize = letterSizePt + 'pt';
     letterBodyRendered.style.lineHeight = letterLineHeight;
@@ -1312,7 +1342,10 @@
     const newSheet = () => {
       const first = sheets.length === 0;
       const top = (first && useLetterhead) ? SHEET.firstTop : SHEET.top;
-      const bottom = (first && useLetterhead) ? SHEET.firstBottom : SHEET.bottom;
+      // Page 1 fits two extra lines below the old limit (Hugo's
+      // request): the letterhead footer artwork only starts at
+      // ~1022px, so this stays safely clear of it.
+      const bottom = (first && useLetterhead) ? Math.min(SHEET.firstBottom + 2 * lineH, 1005) : SHEET.bottom;
       cur = { top, avail: bottom - top, used: 0, units: [] };
       sheets.push(cur);
     };
@@ -1650,7 +1683,7 @@
     }
 
     const blob = window.DocxBuilder.buildDocx(text, options);
-    return { blob, filename: `letter-${targetFont}-${Date.now()}.docx`, targetFont };
+    return { blob, filename: includeLetterhead ? `${currentExportName()}.docx` : `letter-${targetFont}-${Date.now()}.docx`, targetFont };
   }
 
   async function downloadNativeDocx(includeLetterhead = false) {
@@ -1807,7 +1840,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `letter-${fontName}-${Date.now()}.doc`;
+    a.download = includeLetterhead ? `${currentExportName()}.doc` : `letter-${fontName}-${Date.now()}.doc`;
     a.click();
     URL.revokeObjectURL(url);
     showToast(`Downloaded Word (.DOC, 12pt, Justified) with ${fontName}!`);
@@ -1838,6 +1871,89 @@
     }
   }
 
+  // The exact sheet markup + CSS shared by Print and Share PDF,
+  // so both produce the identical A4 pages.
+  const PRINT_SHEET_CSS = `
+    .print-sheet { position: relative; width: 210mm; height: 297mm; overflow: hidden; page-break-after: always; break-after: page; background: #fff; }
+    .print-sheet:last-child { page-break-after: auto; break-after: auto; }
+    .sheet-letterhead { position: absolute; top: 0; left: 0; width: 210mm; height: 297mm; }
+    .sheet-content { position: absolute; left: 20mm; right: 20mm; line-height: 1.6; word-break: break-word; }
+    .sheet-line { min-height: 1em; }
+    .sheet-block { margin-top: 3mm; }
+    .sheet-page-num { position: absolute; bottom: 10mm; left: 0; right: 0; text-align: center; font-family: Arial, sans-serif; font-size: 10pt; color: #666; }
+    .sheet-cont-head { position: absolute; top: 8mm; left: 20mm; right: 20mm; text-align: center; font-family: Arial, sans-serif; font-size: 10.5pt; font-weight: bold; letter-spacing: 0.03em; color: #333; }
+    .en-text { font-family: Arial, Helvetica, sans-serif !important; font-weight: normal; }
+    .page-break-marker { page-break-after: always; break-after: page; height: 0; overflow: hidden; visibility: hidden; }
+    .letter-signatures { margin-top: 10mm; }
+    .sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm 14mm; }
+    .sig-cell { text-align: left; break-inside: avoid; page-break-inside: avoid; }
+    .sig-img-wrap { height: 15mm; display: flex; align-items: flex-end; }
+    .sig-img { max-height: 15mm; max-width: 78%; }
+    .sig-line { border-bottom: 1px dotted #bbb; width: 72%; margin: 1mm 0 2mm 0; }
+    .sig-org, .sig-name { font-size: 11.5pt; line-height: 1.35; text-align: left; }
+    .letter-copies { margin-top: 8mm; font-size: 12pt; }
+    .copies-heading { font-weight: bold; margin-bottom: 1mm; text-align: left; }
+    .copies-line { text-align: left; line-height: 1.4; }
+    .annex-page { page-break-before: always; break-before: page; text-align: center; padding-top: 6mm; }
+    .annex-heading { font-weight: bold; text-align: left; font-size: 12.5pt; margin-bottom: 5mm; }
+    .annex-img { max-width: 170mm; max-height: 235mm; }
+  `;
+
+  function buildPrintSheetsHtml() {
+    const assetBase = location.href.replace(/[^/]*$/, '');
+    const px2mm = (px) => Math.round(px * 0.26458 * 100) / 100;
+    const sheets = buildSheetData();
+    const html = sheets.map((s, idx) => `
+      <div class="print-sheet">
+        ${s.letterhead ? `<img class="sheet-letterhead" src="${assetBase}assets/awc-letterhead.jpg">` : ''}
+        ${sheetFurniture(idx, sheets.length)}
+        <div class="sheet-content" style="top:${px2mm(s.top)}mm; font-family:${letterFontFamily()}; font-size:${letterSizePt}pt; line-height:${letterLineHeight}; text-align:${letterAlign === 'both' ? 'justify' : letterAlign};">${s.units.map(u => u.html).join('')}</div>
+      </div>`).join('');
+    return html.replace(/src="assets\//g, `src="${assetBase}assets/`);
+  }
+
+  // Share a real A4 PDF file: the exact print sheets are rendered
+  // off-screen and assembled into a PDF (jsPDF + html2canvas,
+  // bundled), then shared via the Web Share API — download fallback
+  // where file sharing is unavailable.
+  async function sharePdf() {
+    if (!window.html2canvas || !window.jspdf) { showToast('PDF tools failed to load', '⚠️'); return; }
+    showToast('Building PDF…', '📄');
+    const name = currentExportName();
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:fixed; left:-10000px; top:0; background:#fff; z-index:-1;';
+    wrap.innerHTML = `<style>${PRINT_SHEET_CSS}</style>` + buildPrintSheetsHtml();
+    document.body.appendChild(wrap);
+    try {
+      if (document.fonts && document.fonts.ready) await document.fonts.ready;
+      await new Promise(r => setTimeout(r, 350));
+      const sheetEls = wrap.querySelectorAll('.print-sheet');
+      const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+      for (let i = 0; i < sheetEls.length; i++) {
+        const canvas = await window.html2canvas(sheetEls[i], { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
+        if (i > 0) pdf.addPage();
+        pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, 297);
+      }
+      const blob = pdf.output('blob');
+      const file = new File([blob], `${name}.pdf`, { type: 'application/pdf' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: file.name }); } catch (e) { /* cancelled */ }
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('Sharing not supported in this browser — PDF downloaded instead', '📤');
+      }
+    } catch (e) {
+      showToast('Could not build the PDF', '⚠️');
+    } finally {
+      wrap.remove();
+    }
+  }
+
   // Print Document (Direct A4 Print Layout)
   async function printDocument(isLetterStudio = false) {
     const printWindow = window.open('', '_blank');
@@ -1851,15 +1967,7 @@
       // so page 1 content can never run under the letterhead footer.
       const assetBase = location.href.replace(/[^/]*$/, '');
       try {
-        const px2mm = (px) => Math.round(px * 0.26458 * 100) / 100;
-        const sheets = buildSheetData();
-        bodyContent = sheets.map((s, idx) => `
-          <div class="print-sheet">
-            ${s.letterhead ? `<img class="sheet-letterhead" src="${assetBase}assets/awc-letterhead.jpg">` : ''}
-            ${sheetFurniture(idx, sheets.length)}
-            <div class="sheet-content" style="top:${px2mm(s.top)}mm; font-family:${letterFontFamily()}; font-size:${letterSizePt}pt; line-height:${letterLineHeight}; text-align:${letterAlign === 'both' ? 'justify' : letterAlign};">${s.units.map(u => u.html).join('')}</div>
-          </div>`).join('');
-        bodyContent = bodyContent.replace(/src="assets\//g, `src="${assetBase}assets/`);
+        bodyContent = buildPrintSheetsHtml();
         usedSheets = true;
       } catch (e) {
         bodyContent = printableElement.innerHTML.replace(/src="assets\//g, `src="${assetBase}assets/`);
@@ -1878,21 +1986,12 @@
     printWindow.document.write(`
       <html>
         <head>
-          <title>Formal Letter Print</title>
+          <title>${isLetterStudio ? currentExportName() : 'Formal Letter Print'}</title>
           <style>
             ${fontFaceCss}
             @page { size: A4; margin: ${isLetterStudio ? '0' : '1.5cm'}; }
             body { font-family: '${fontName}', sans-serif; padding: 0; margin: 0; background: #fff; color: #000; text-align: justify; text-justify: inter-word; }
-            .en-text { font-family: Arial, Helvetica, sans-serif !important; font-weight: normal; }
-            .print-sheet { position: relative; width: 210mm; height: 297mm; overflow: hidden; page-break-after: always; break-after: page; }
-            .print-sheet:last-child { page-break-after: auto; break-after: auto; }
-            .sheet-letterhead { position: absolute; top: 0; left: 0; width: 210mm; height: 297mm; }
-            .sheet-content { position: absolute; left: 20mm; right: 20mm; line-height: 1.6; word-break: break-word; }
-            .sheet-line { min-height: 1em; }
-            .sheet-page-num { position: absolute; bottom: 10mm; left: 0; right: 0; text-align: center; font-family: Arial, sans-serif; font-size: 10pt; color: #666; }
-            .sheet-cont-head { position: absolute; top: 8mm; left: 20mm; right: 20mm; text-align: center; font-family: Arial, sans-serif; font-size: 10.5pt; font-weight: bold; letter-spacing: 0.03em; color: #333; }
-            .sheet-block { margin-top: 3mm; }
-            .page-break-marker { page-break-after: always; break-after: page; height: 0; overflow: hidden; visibility: hidden; }
+            ${PRINT_SHEET_CSS}
             .print-wrap { position: relative; padding: 18mm 20mm; box-sizing: border-box; }
             .print-wrap.with-letterhead { padding: 54mm 20mm 24mm 20mm; }
             .letterhead-bg { display: none; }
@@ -1903,19 +2002,6 @@
             .letter-logo-subtitle { font-family: Arial, sans-serif; font-size: 9pt; color: #555; }
             .letter-body-content { font-size: ${isLetterStudio ? letterSizePt : 12}pt; line-height: ${isLetterStudio ? letterLineHeight : 1.6}; font-family: '${fontName}', sans-serif; text-align: justify; text-justify: inter-word; }
             .letter-footer-banner { border-top: 2px solid #999; margin-top: 40px; padding-top: 10px; font-family: Arial, sans-serif; font-size: 9pt; display: flex; justify-content: space-between; }
-            .letter-signatures { margin-top: 10mm; }
-            .sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm 14mm; }
-            .sig-cell { text-align: left; break-inside: avoid; page-break-inside: avoid; }
-            .sig-img-wrap { height: 15mm; display: flex; align-items: flex-end; }
-            .sig-img { max-height: 15mm; max-width: 78%; }
-            .sig-line { border-bottom: 1px dotted #bbb; width: 72%; margin: 1mm 0 2mm 0; }
-            .sig-org, .sig-name { font-size: 11.5pt; line-height: 1.35; text-align: left; }
-            .letter-copies { margin-top: 8mm; font-size: 12pt; }
-            .copies-heading { font-weight: bold; margin-bottom: 1mm; text-align: left; }
-            .copies-line { text-align: left; line-height: 1.4; }
-            .annex-page { page-break-before: always; break-before: page; text-align: center; padding-top: 6mm; }
-            .annex-heading { font-weight: bold; text-align: left; font-size: 12.5pt; margin-bottom: 5mm; }
-            .annex-img { max-width: 170mm; max-height: 235mm; }
           </style>
         </head>
         <body>
@@ -2161,6 +2247,11 @@
     if (previewView === 'exact') buildExactPreview();
   });
 
+  docNameInput.addEventListener('input', () => {
+    docNameAuto = docNameInput.value.trim() === defaultDocName();
+    saveSettings();
+  });
+
   // Letter language: Sinhala (converted) or English (as typed)
   selLangMode.addEventListener('change', () => {
     letterLang = selLangMode.value;
@@ -2257,6 +2348,8 @@
     reader.readAsText(file);
     restoreFile.value = '';
   });
+
+  btnSharePdf.addEventListener('click', sharePdf);
 
   // Share the DOCX straight to WhatsApp / email (Web Share API);
   // falls back to a download where file sharing is unavailable.
@@ -2420,6 +2513,7 @@
   // Restore the auto-saved draft + remembered settings; fall back
   // to the sample letter on a first visit.
   const hadDraft = restoreSavedState();
+  if (!docNameInput.value) docNameInput.value = defaultDocName();
   if (!hadDraft) inputText.value = sampleComplaintLetter;
   updateLetterheadDesign();
   runConversion();

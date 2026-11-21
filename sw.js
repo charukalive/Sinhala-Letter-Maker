@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sinhala-font-studio-v26-pdf-annexures';
+const CACHE_NAME = 'sinhala-font-studio-v27-share-pdf';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -12,6 +12,8 @@ const ASSETS_TO_CACHE = [
   './js/engine/docxBuilder.js',
   './js/vendor/pdf.min.js',
   './js/vendor/pdf.worker.min.js',
+  './js/vendor/html2canvas.min.js',
+  './js/vendor/jspdf.umd.min.js',
   './js/app.js',
   './manifest.json',
   './icon-192.png',

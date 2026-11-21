@@ -235,6 +235,10 @@
               <option value="en">English (as typed)</option>
             </select>
           </div>
+          <div class="control-item">
+            <label for="docName">File name (Print / Share / Download):</label>
+            <input type="text" id="docName" class="control-select" style="min-width: 250px;">
+          </div>
         </div>
 
         <div class="panel-actions">
@@ -246,6 +250,9 @@
           </button>
           <button class="btn-tool" id="btnShareDocx">
             📤 Share .DOCX
+          </button>
+          <button class="btn-tool" id="btnSharePdf">
+            📤 Share PDF
           </button>
           <button class="btn-tool" id="btnLetterDoc">
             .DOC
@@ -530,7 +537,7 @@
   <!-- Footer -->
   <footer class="app-footer">
     <div>Sinhala Font & Letter Studio • 4u-Bindumathi • FM-Malithi • FM-Abhaya • IsiAbhaya • 100% Mobile Ready</div>
-    <div style="margin-top: 0.25rem; opacity: 0.75;">Build v26 — if this number is lower than the latest I sent you, close the app fully and reopen it</div>
+    <div style="margin-top: 0.25rem; opacity: 0.75;">Build v27 — if this number is lower than the latest I sent you, close the app fully and reopen it</div>
   </footer>
 
   <!-- Scripts -->
@@ -542,6 +549,8 @@
   <script src="js/engine/mixedFontFormatter.js"></script>
   <script src="js/engine/docxBuilder.js"></script>
   <script src="js/vendor/pdf.min.js"></script>
+  <script src="js/vendor/html2canvas.min.js"></script>
+  <script src="js/vendor/jspdf.umd.min.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
