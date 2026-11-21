@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sinhala-font-studio-v25-formatting';
+const CACHE_NAME = 'sinhala-font-studio-v26-pdf-annexures';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -10,6 +10,8 @@ const ASSETS_TO_CACHE = [
   './js/engine/singlishToUnicode.js',
   './js/engine/mixedFontFormatter.js',
   './js/engine/docxBuilder.js',
+  './js/vendor/pdf.min.js',
+  './js/vendor/pdf.worker.min.js',
   './js/app.js',
   './manifest.json',
   './icon-192.png',

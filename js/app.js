@@ -77,8 +77,7 @@
   const copiesText = document.getElementById('copiesText');
   const annexIndexText = document.getElementById('annexIndexText');
   const letterAnnexIndex = document.getElementById('letterAnnexIndex');
-  const annexInput = document.getElementById('annexInput');
-  const annexList = document.getElementById('annexList');
+  const annexSlotsEl = document.getElementById('annexSlots');
 
   // AWC signatories: signature images extracted from Hugo's own letter
   // (16th October 2026 Letter to Min of Environment .docx), in the
@@ -99,7 +98,27 @@
   ];
 
   // Annexure images added by the user: { name, dataUrl, ext, w, h }
-  let annexures = [];
+  // Annexures are organised in slots: slot i belongs to line i of
+  // the annexure list, and holds that annexure's pages (images, or
+  // the pages of one PDF). Only a slot's first page carries its
+  // heading in the letter.
+  let annexSlots = [{ pages: [] }];
+  function annexHeading(idx, lineText) {
+    const nn = String(idx + 1).padStart(2, '0');
+    const base = letterLang === 'en' ? 'Annexure ' + nn : 'ඇමුණුම ' + nn;
+    return lineText ? `${base} – ${lineText}` : base;
+  }
+  function flatAnnexPages() {
+    const lines = annexIndexText.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const out = [];
+    annexSlots.forEach((slot, i) => {
+      const clean = (lines[i] || '').replace(/^\s*\*\s*/, '');
+      (slot.pages || []).forEach((p, j) => {
+        out.push({ dataUrl: p.dataUrl, ext: p.ext, w: p.w, h: p.h, name: p.name, heading: annexHeading(i, clean), first: j === 0 });
+      });
+    });
+    return out;
+  }
 
   // Letter formatting state (Letter Studio)
   const selLetterSize = document.getElementById('selLetterSize');
@@ -157,7 +176,7 @@
         }));
       } catch (e) { /* storage unavailable */ }
       try {
-        localStorage.setItem(LS_DRAFT_ANNEX, JSON.stringify(annexures));
+        localStorage.setItem(LS_DRAFT_ANNEX, JSON.stringify(annexSlots));
       } catch (e) { /* annexure images can exceed the quota — the letter text is still saved */ }
     }, 300);
   }
@@ -215,9 +234,15 @@
       if (typeof draft.annexIndex === 'string') annexIndexText.value = draft.annexIndex;
       try {
         const ann = JSON.parse(localStorage.getItem(LS_DRAFT_ANNEX) || '[]');
-        if (Array.isArray(ann)) annexures = ann;
+        if (Array.isArray(ann) && ann.length) {
+          // Migrate the pre-slot shape (a flat list of images, one
+          // annexure each) into one slot per annexure.
+          annexSlots = ann.map(a => a && Array.isArray(a.pages)
+            ? a
+            : { pages: [{ dataUrl: a.dataUrl, ext: a.ext, w: a.w, h: a.h, name: a.name }] });
+        }
       } catch (e) { /* ignore */ }
-      renderAnnexList();
+      renderAnnexSlots();
     }
     return !!draft;
   }
@@ -757,9 +782,9 @@
     setGap(gapAnnexEl, gapBeforeAnnex, 'Annexure list', annexIndexLines.length > 0);
 
     letterAnnexures.style.fontFamily = letterFontFamily();
-    letterAnnexures.innerHTML = annexures.map((a, i) => `
+    letterAnnexures.innerHTML = flatAnnexPages().map(a => `
       <div class="annex-page">
-        <div class="annex-heading">${convertForLetter(letterLang === 'en' ? 'Annexure ' + String(i + 1).padStart(2, '0') : 'ඇමුණුම ' + String(i + 1).padStart(2, '0'))}</div>
+        ${a.first ? `<div class="annex-heading">${convertForLetter(a.heading)}</div>` : ''}
         <img class="annex-img" src="${a.dataUrl}" alt="">
       </div>`).join('');
 
@@ -788,23 +813,89 @@
     });
   }
 
-  function renderAnnexList() {
-    if (!annexures.length) {
-      annexList.innerHTML = '<span class="annex-empty">No annexures added</span>';
-      return;
-    }
-    annexList.innerHTML = annexures.map((a, i) => `
-      <div class="annex-list-item">
-        <span>ඇමුණුම ${String(i + 1).padStart(2, '0')} — ${escapeHtml(a.name)}</span>
-        <button class="annex-remove" data-annex-idx="${i}" title="Remove">✕</button>
-      </div>`).join('');
-    annexList.querySelectorAll('.annex-remove').forEach(btn => {
-      btn.addEventListener('click', () => {
-        annexures.splice(parseInt(btn.dataset.annexIdx, 10), 1);
-        renderAnnexList();
-        updateLetterEnding();
-      });
+  // One file box per annexure-list line; files added to a box
+  // become that annexure's pages.
+  function renderAnnexSlots() {
+    if (!annexSlotsEl) return;
+    const lines = annexIndexText.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const count = Math.max(lines.length, annexSlots.length, 1);
+    while (annexSlots.length < count) annexSlots.push({ pages: [] });
+    annexSlotsEl.innerHTML = annexSlots.map((slot, i) => {
+      const clean = (lines[i] || '').replace(/^\s*\*\s*/, '');
+      return `
+      <div class="annex-slot">
+        <div class="annex-slot-title">${escapeHtml(annexHeading(i, clean))}</div>
+        <input type="file" accept="image/*,.pdf" multiple class="ending-file" data-slot-file="${i}">
+        ${(slot.pages || []).length ? slot.pages.map((p, j) => `
+          <div class="annex-list-item">
+            <span>${escapeHtml(p.name || 'Image')}</span>
+            <button class="annex-remove" data-slot="${i}" data-page="${j}" title="Remove">✕</button>
+          </div>`).join('') : '<div class="annex-empty">No files yet — add images or a PDF</div>'}
+      </div>`;
+    }).join('');
+  }
+
+  function imageFileToPage(file) {
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => resolve({
+          name: file.name, dataUrl: reader.result,
+          ext: (file.name.split('.').pop() || 'png').toLowerCase().replace('jpeg', 'jpg'),
+          w: img.naturalWidth, h: img.naturalHeight
+        });
+        img.onerror = () => resolve(null);
+        img.src = reader.result;
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
     });
+  }
+
+  // A PDF annexure is rendered page by page (PDF.js, bundled with
+  // the app so it works offline); the pages join that annexure's
+  // slot, and only the first carries the annexure heading.
+  async function pdfFileToPages(file) {
+    if (!window.pdfjsLib) throw new Error('PDF support failed to load');
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/vendor/pdf.worker.min.js';
+    const buf = await file.arrayBuffer();
+    const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+    const pages = [];
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const viewport = page.getViewport({ scale: 2 });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(viewport.width);
+      canvas.height = Math.round(viewport.height);
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      pages.push({
+        name: `${file.name} — page ${p}`,
+        dataUrl: canvas.toDataURL('image/jpeg', 0.85),
+        ext: 'jpg', w: canvas.width, h: canvas.height
+      });
+    }
+    return pages;
+  }
+
+  async function addFilesToSlot(slotIdx, files) {
+    showToast('Adding files…', '📎');
+    for (const file of files) {
+      try {
+        if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
+          const pages = await pdfFileToPages(file);
+          pages.forEach(p => annexSlots[slotIdx].pages.push(p));
+        } else if (file.type.startsWith('image/')) {
+          const page = await imageFileToPage(file);
+          if (page) annexSlots[slotIdx].pages.push(page);
+        }
+      } catch (e) {
+        showToast(`Could not add ${file.name}`, '⚠️');
+      }
+    }
+    renderAnnexSlots();
+    updateLetterEnding();
+    saveDraft();
   }
 
   // --- Doc-editor style formatting for the letter body ---
@@ -1296,15 +1387,15 @@
         sheets.splice(i, 1);
       }
     }
-    annexures.forEach((a, i) => {
-      const heading = convertForLetter(letterLang === 'en' ? 'Annexure ' + String(i + 1).padStart(2, '0') : 'ඇමුණුම ' + String(i + 1).padStart(2, '0'));
+    flatAnnexPages().forEach(a => {
+      const heading = a.first ? convertForLetter(a.heading) : '';
       const maxH = SHEET.bottom - SHEET.top - 70;
       const scale = Math.min((SHEET.w - SHEET.padX * 2) / a.w, maxH / a.h, 1);
       const wpx = Math.round(a.w * scale);
       const hpx = Math.round(a.h * scale);
       sheets.push({
         top: SHEET.top, avail: SHEET.bottom - SHEET.top, used: 0,
-        units: [{ html: `<div class="annex-heading">${heading}</div><div style="text-align:center;"><img src="${a.dataUrl}" style="width:${wpx}px; height:${hpx}px;"></div>`, h: maxH, kind: 'block' }]
+        units: [{ html: `${heading ? `<div class="annex-heading">${heading}</div>` : ''}<div style="text-align:center;"><img src="${a.dataUrl}" style="width:${wpx}px; height:${hpx}px;"></div>`, h: maxH, kind: 'block' }]
       });
     });
     return sheets.map((s, idx) => ({ ...s, letterhead: idx === 0 && useLetterhead }));
@@ -1548,11 +1639,12 @@
       if (chkContHeader.checked && selLetterhead.value !== 'none') {
         options.contHeaderText = letterHeadTitle.textContent;
       }
-      if (annexures.length) {
-        options.annexures = annexures.map((a, i) => ({
+      const flat = flatAnnexPages();
+      if (flat.length) {
+        options.annexures = flat.map(a => ({
           data: dataUrlToBytes(a.dataUrl),
           ext: a.ext, w: a.w, h: a.h,
-          heading: (letterLang === 'en' ? 'Annexure ' : 'ඇමුණුම ') + String(i + 1).padStart(2, '0')
+          heading: a.first ? a.heading : ''
         }));
       }
     }
@@ -2123,8 +2215,8 @@
     inputText.value = '';
     copiesText.value = '';
     annexIndexText.value = '';
-    annexures = [];
-    renderAnnexList();
+    annexSlots = [{ pages: [] }];
+    renderAnnexSlots();
     try { localStorage.removeItem(LS_DRAFT); localStorage.removeItem(LS_DRAFT_ANNEX); } catch (e) { /* ignore */ }
     updateLetterStudio();
     showToast('New blank letter — start typing', '🧹');
@@ -2235,31 +2327,26 @@
   });
 
   copiesText.addEventListener('input', () => { updateLetterEnding(); saveDraft(); });
-  annexIndexText.addEventListener('input', () => { updateLetterEnding(); saveDraft(); });
+  annexIndexText.addEventListener('input', () => { updateLetterEnding(); saveDraft(); renderAnnexSlots(); });
 
-  annexInput.addEventListener('change', () => {
-    const files = Array.from(annexInput.files || []);
-    files.forEach(file => {
-      if (!file.type.startsWith('image/')) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const img = new Image();
-        img.onload = () => {
-          annexures.push({
-            name: file.name,
-            dataUrl: reader.result,
-            ext: (file.name.split('.').pop() || 'png').toLowerCase().replace('jpeg', 'jpg'),
-            w: img.naturalWidth,
-            h: img.naturalHeight
-          });
-          renderAnnexList();
-          updateLetterEnding();
-        };
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(file);
-    });
-    annexInput.value = '';
+  // Annexure slot file boxes (delegated: the boxes are re-rendered
+  // whenever the annexure list changes).
+  annexSlotsEl.addEventListener('change', (e) => {
+    const inp = e.target.closest ? e.target.closest('[data-slot-file]') : null;
+    if (!inp) return;
+    const idx = parseInt(inp.dataset.slotFile, 10);
+    const files = Array.from(inp.files || []);
+    inp.value = '';
+    if (files.length) addFilesToSlot(idx, files);
+  });
+  annexSlotsEl.addEventListener('click', (e) => {
+    const btn = e.target.closest ? e.target.closest('[data-slot][data-page]') : null;
+    if (!btn) return;
+    const slot = annexSlots[parseInt(btn.dataset.slot, 10)];
+    if (slot) slot.pages.splice(parseInt(btn.dataset.page, 10), 1);
+    renderAnnexSlots();
+    updateLetterEnding();
+    saveDraft();
   });
 
   selLetterFont.addEventListener('change', () => {
@@ -2327,7 +2414,7 @@
   btnViewEdit.classList.add('view-active');
   loadCustomSignatures();
   renderSigCheckboxes();
-  renderAnnexList();
+  renderAnnexSlots();
   refreshTemplateList();
 
   // Restore the auto-saved draft + remembered settings; fall back

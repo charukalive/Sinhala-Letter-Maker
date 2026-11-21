@@ -1025,6 +1025,19 @@ textarea.editor-input::placeholder {
   background-position: bottom left;
 }
 
+.annex-slot {
+  border: 1px dashed var(--border, #94a3b8);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  margin-bottom: 0.5rem;
+}
+
+.annex-slot-title {
+  font-weight: 600;
+  font-size: 0.92rem;
+  margin-bottom: 0.35rem;
+}
+
 .color-btn {
   width: 22px !important;
   height: 22px;
