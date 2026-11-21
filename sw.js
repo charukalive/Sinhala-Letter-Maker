@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sinhala-font-studio-v15-breaklines';
+const CACHE_NAME = 'sinhala-font-studio-v16-fresh';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -31,8 +31,15 @@ const ASSETS_TO_CACHE = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      // cache: 'reload' bypasses the browser HTTP cache, so a new
+      // service worker never installs stale copies of the app code.
+      for (const url of ASSETS_TO_CACHE) {
+        try {
+          const response = await fetch(new Request(url, { cache: 'reload' }));
+          if (response.ok) await cache.put(url, response);
+        } catch (err) { /* offline install: asset is cached on first fetch */ }
+      }
     })
   );
   self.skipWaiting();
@@ -54,9 +61,13 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Page loads: network first, so app updates appear immediately
-  // (cache is only the offline fallback).
-  if (event.request.mode === 'navigate') {
+  const url = new URL(event.request.url);
+  const isCode = event.request.mode === 'navigate' ||
+    url.pathname.endsWith('.js') || url.pathname.endsWith('.css') ||
+    url.pathname.endsWith('.html') || url.pathname.endsWith('.json');
+  // App code: network first, so the latest build is always used for
+  // the app itself and for Print/PDF (cache is the offline fallback).
+  if (isCode) {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
@@ -68,6 +79,7 @@ self.addEventListener('fetch', (event) => {
     );
     return;
   }
+  // Fonts and images are large and unchanging: cache first.
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       return cachedResponse || fetch(event.request);

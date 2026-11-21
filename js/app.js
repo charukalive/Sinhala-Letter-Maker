@@ -362,7 +362,8 @@
     const marker = document.createElement('div');
     marker.className = 'page-break-marker';
     marker.contentEditable = 'false';
-    marker.textContent = '⤓ PAGE BREAK — NEXT PAGE STARTS HERE';
+    marker.title = 'Tap to remove this page break';
+    marker.textContent = '⤓ PAGE BREAK — NEXT PAGE STARTS HERE (tap ✕ to remove)';
     return marker;
   }
 
@@ -515,12 +516,16 @@
   // The A4 letter body is contenteditable: Bold/Italic/Underline apply
   // to the current selection, alignment and size apply to the letter.
   function applyInlineFormat(command) {
-    letterBodyRendered.focus();
+    // Capture the range BEFORE focus(): focusing the letter can
+    // collapse the live selection to position 0, which would make
+    // letterRange() return the wrong range.
     const r = letterRange();
-    if (r) {
+    const saved = r ? r.cloneRange() : null;
+    letterBodyRendered.focus();
+    if (saved) {
       const sel = window.getSelection();
       sel.removeAllRanges();
-      sel.addRange(r);
+      sel.addRange(saved);
     }
     document.execCommand(command, false, null);
   }
@@ -550,13 +555,14 @@
   // starts on the next page in the Exact Preview, Print/PDF and DOCX.
   const btnPageBreak = document.getElementById('btnPageBreak');
   btnPageBreak.addEventListener('click', () => {
-    const marker = document.createElement('div');
-    marker.className = 'page-break-marker';
-    marker.contentEditable = 'false';
-    marker.textContent = '⤓ PAGE BREAK — NEXT PAGE STARTS HERE';
+    const marker = createPageBreakMarker();
+    // Capture the cursor BEFORE focus(): focusing can collapse the
+    // live selection to the top of the letter, and the break would
+    // land at position 0 instead of at the cursor.
+    const captured = letterRange();
+    const activeRange = captured ? captured.cloneRange() : null;
     letterBodyRendered.focus();
     const sel = window.getSelection();
-    const activeRange = letterRange();
     if (activeRange) {
       sel.removeAllRanges();
       sel.addRange(activeRange);
@@ -585,6 +591,23 @@
     if (previewView === 'exact') buildExactPreview();
     showToast('Page break added — content after it starts a new page', '⤓');
   });
+
+  // Tap a page-break bar to remove that break (and one of the line
+  // breaks inserted with it, so the text rejoins cleanly).
+  letterBodyRendered.addEventListener('click', (e) => {
+    const marker = e.target.closest ? e.target.closest('.page-break-marker') : null;
+    if (!marker) return;
+    e.preventDefault();
+    const next = marker.nextElementSibling;
+    const prev = marker.previousElementSibling;
+    marker.remove();
+    if (next && next.tagName === 'BR') next.remove();
+    else if (prev && prev.tagName === 'BR') prev.remove();
+    savedLetterRange = null;
+    if (previewView === 'exact') buildExactPreview();
+    showToast('Page break removed', '🗑️');
+  });
+
   letterBodyRendered.addEventListener('input', () => {
     if (previewView === 'exact') buildExactPreview();
   });
@@ -686,7 +709,7 @@
           units.push({ html: '', h: 0, kind: 'break', break: true });
           return;
         }
-        const wrapped = `<div class="sheet-line">${html || '&nbsp;'}</div>`;
+        const wrapped = `<div class="sheet-line">${html || '<br>'}</div>`;
         units.push({ html: wrapped, h: html ? Math.ceil(measureSheetHtml(wrapped)) + 1 : lineH, kind: 'line' });
       });
     };
@@ -720,7 +743,7 @@
       sheets.push(cur);
     };
     const isEmptyLine = (u) => u.kind === 'line' &&
-      (u.html === '<div class="sheet-line">&nbsp;</div>' || u.html === '<div class="sheet-line"></div>');
+      (u.html === '<div class="sheet-line"><br></div>' || u.html === '<div class="sheet-line"></div>');
     newSheet();
     for (const u of units) {
       if (u.break) {
@@ -857,7 +880,7 @@
     const fontName = getSelectedFont(false);
     const lines = lastRichHtml.split(/\r?\n|<br\s*\/?>/i);
     const paragraphsHtml = lines.map(line => {
-      return `<p class="MsoNormal" style="margin: 0pt; margin-top: 0pt; margin-bottom: 0pt; line-height: 1.15; font-family: '${fontName}', Arial, sans-serif; font-size: 12pt; text-align: justify; text-justify: inter-word;">${line || '&nbsp;'}</p>`;
+      return `<p class="MsoNormal" style="margin: 0pt; margin-top: 0pt; margin-bottom: 0pt; line-height: 1.15; font-family: '${fontName}', Arial, sans-serif; font-size: 12pt; text-align: justify; text-justify: inter-word;">${line || '<br>'}</p>`;
     }).join('\n');
 
     const htmlToCopy = `
@@ -1028,7 +1051,7 @@
     const sourceHtml = lastRichHtml || escapeHtml(text);
     const lines = sourceHtml.split(/\r?\n|<br\s*\/?>/i);
     const paragraphsHtml = lines.map(line => {
-      return `<p class="MsoNormal" style="margin: 0pt; margin-top: 0pt; margin-bottom: 0pt; line-height: 1.15; font-size: 12pt; text-align: justify; text-justify: inter-word;">${line || '&nbsp;'}</p>`;
+      return `<p class="MsoNormal" style="margin: 0pt; margin-top: 0pt; margin-bottom: 0pt; line-height: 1.15; font-size: 12pt; text-align: justify; text-justify: inter-word;">${line || '<br>'}</p>`;
     }).join('\n');
 
     let headerHtml = '';
