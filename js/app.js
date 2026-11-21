@@ -346,16 +346,41 @@
   // whenever the input text or letter font changes. Remember each
   // break's line position and restore it after every rebuild, so a
   // break can never silently vanish before printing.
-  function getPageBreakLineIndices(rootEl) {
-    const indices = [];
-    let line = 0;
-    const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_ELEMENT);
-    let node;
-    while ((node = walker.nextNode())) {
-      if (node.tagName === 'BR') line++;
-      else if (node.classList && node.classList.contains('page-break-marker')) indices.push(line);
+  // Remember each break by the TEXT of the line it follows, not just
+  // its line number — if Hugo edits the letter text above a break,
+  // the break then stays with its own line instead of drifting onto
+  // whatever line now happens to have the same number.
+  function getPageBreakAnchors(rootEl) {
+    const anchors = [];
+    let lastText = '';
+    let lastTextLine = -1;
+    collectLineHtml(rootEl).forEach((frag, i) => {
+      if (frag.includes('page-break-marker')) {
+        anchors.push({ line: i, beforeText: lastText, beforeLine: lastTextLine });
+        return;
+      }
+      const t = frag.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      if (t) { lastText = t.slice(0, 80); lastTextLine = i; }
+    });
+    return anchors;
+  }
+
+  function restorePageBreak(anchor) {
+    if (anchor.beforeText && anchor.beforeLine >= 0) {
+      const frags = collectLineHtml(letterBodyRendered);
+      for (let j = 0; j < frags.length; j++) {
+        if (frags[j].includes('page-break-marker')) continue;
+        const t = frags[j].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        if (t && t === anchor.beforeText) {
+          // The break goes immediately after the line it followed.
+          // (Any blank line that sat between that line and the break
+          // is not preserved — the break's place among the text is.)
+          insertPageBreakAtLine(j + 1);
+          return;
+        }
+      }
     }
-    return indices;
+    insertPageBreakAtLine(anchor.line);
   }
 
   function createPageBreakMarker() {
@@ -391,7 +416,7 @@
   function updateLetterStudio() {
     const val = inputText.value || sampleComplaintLetter;
     const fontChoice = selLetterFont.value; // '4u-Bindumathi', 'FM-Malithi', 'FM-Abhaya', 'IsiAbhaya', 'unicode'
-    const breakLines = getPageBreakLineIndices(letterBodyRendered);
+    const breakAnchors = getPageBreakAnchors(letterBodyRendered);
 
     const { mainText, trailingText } = splitTrailingSections(val);
     const fam = fontChoice === 'unicode'
@@ -401,7 +426,7 @@
     letterTrailing.style.fontFamily = fam;
     letterBodyRendered.innerHTML = renderTextToHtml(mainText);
     letterTrailing.innerHTML = trailingText.trim() ? renderTextToHtml(trailingText) : '';
-    breakLines.forEach(L => insertPageBreakAtLine(L));
+    breakAnchors.forEach(a => restorePageBreak(a));
 
     updateEnglishHighlight();
     updateLetterEnding();
@@ -592,6 +617,26 @@
     showToast('Page break added — content after it starts a new page', '⤓');
   });
 
+  // Remove every page break in the letter at once.
+  const btnRemoveBreaks = document.getElementById('btnRemoveBreaks');
+  btnRemoveBreaks.addEventListener('click', () => {
+    const markers = letterBodyRendered.querySelectorAll('.page-break-marker');
+    if (!markers.length) {
+      showToast('No page breaks in this letter', 'ℹ️');
+      return;
+    }
+    markers.forEach(marker => {
+      const next = marker.nextElementSibling;
+      const prev = marker.previousElementSibling;
+      marker.remove();
+      if (next && next.tagName === 'BR') next.remove();
+      else if (prev && prev.tagName === 'BR') prev.remove();
+    });
+    savedLetterRange = null;
+    if (previewView === 'exact') buildExactPreview();
+    showToast(`Removed ${markers.length} page break${markers.length > 1 ? 's' : ''}`, '🗑️');
+  });
+
   // Tap a page-break bar to remove that break (and one of the line
   // breaks inserted with it, so the text rejoins cleanly).
   letterBodyRendered.addEventListener('click', (e) => {
@@ -686,6 +731,29 @@
     return el.innerHTML.split(/<br\s*\/?>/i);
   }
 
+  // Split an HTML fragment into word chunks (tags travel with the
+  // word that follows them) so a paragraph can be cut at a word
+  // boundary; joining the chunks reproduces the fragment exactly.
+  function tokenizeWords(html) {
+    const chunks = [];
+    let cur = '';
+    const re = /(<[^>]+>)|([^<]+)/g;
+    let m;
+    while ((m = re.exec(html)) !== null) {
+      if (m[1] !== undefined) { cur += m[1]; continue; }
+      const parts = m[2].match(/\S+\s*|\s+/g) || [];
+      for (const p of parts) {
+        cur += p;
+        if (/\S/.test(p)) { chunks.push(cur); cur = ''; }
+      }
+    }
+    if (cur) {
+      if (chunks.length) chunks[chunks.length - 1] += cur;
+      else chunks.push(cur);
+    }
+    return chunks;
+  }
+
   function measureSheetHtml(html) {
     if (!sheetMeasurer) {
       sheetMeasurer = document.createElement('div');
@@ -710,7 +778,7 @@
           return;
         }
         const wrapped = `<div class="sheet-line">${html || '<br>'}</div>`;
-        units.push({ html: wrapped, h: html ? Math.ceil(measureSheetHtml(wrapped)) + 1 : lineH, kind: 'line' });
+        units.push({ html: wrapped, h: html ? Math.ceil(measureSheetHtml(wrapped)) + 1 : lineH, kind: 'line', frag: html });
       });
     };
     addLines(letterBodyRendered);
@@ -744,17 +812,59 @@
     };
     const isEmptyLine = (u) => u.kind === 'line' &&
       (u.html === '<div class="sheet-line"><br></div>' || u.html === '<div class="sheet-line"></div>');
+    // Split a long paragraph at a word boundary so its first part
+    // exactly fills the space left on the current sheet — pages then
+    // fill up like a word processor instead of ending half-empty
+    // whenever a whole paragraph does not fit.
+    const splitLineUnit = (u, maxH) => {
+      const chunks = tokenizeWords(u.frag);
+      if (chunks.length < 2) return null;
+      const heightOf = (frag) => Math.ceil(measureSheetHtml(`<div class="sheet-line">${frag}</div>`)) + 1;
+      let lo = 1, hi = chunks.length - 1, best = 0;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (heightOf(chunks.slice(0, mid).join('')) <= maxH) { best = mid; lo = mid + 1; }
+        else hi = mid - 1;
+      }
+      if (!best) return null;
+      const headFrag = chunks.slice(0, best).join('');
+      const tailFrag = chunks.slice(best).join('');
+      if (!tailFrag.replace(/<[^>]+>/g, '').trim()) return null;
+      return [
+        { html: `<div class="sheet-line">${headFrag}</div>`, h: heightOf(headFrag), kind: 'line', frag: headFrag },
+        { html: `<div class="sheet-line">${tailFrag}</div>`, h: heightOf(tailFrag), kind: 'line', frag: tailFrag }
+      ];
+    };
+
     newSheet();
-    for (const u of units) {
+    const queue = units.slice();
+    for (let i = 0; i < queue.length;) {
+      const u = queue[i];
       if (u.break) {
         // A break only starts a new page when real content precedes
         // it — a break at the very start must not blank page 1.
         if (cur.units.some(x => !isEmptyLine(x))) newSheet();
+        i++;
         continue;
       }
-      if (cur.units.length && cur.used + u.h > cur.avail) newSheet();
+      const remaining = cur.avail - cur.used;
+      if (cur.units.length && u.h > remaining) {
+        if (u.kind === 'line' && u.frag && remaining >= lineH) {
+          const parts = splitLineUnit(u, remaining);
+          if (parts) {
+            cur.units.push(parts[0]);
+            cur.used += parts[0].h;
+            queue.splice(i, 1, parts[1]);
+            newSheet();
+            continue;
+          }
+        }
+        newSheet();
+        continue;
+      }
       cur.units.push(u);
       cur.used += u.h;
+      i++;
     }
     // Never emit a blank sheet (e.g. from a break at the very end).
     for (let i = sheets.length - 1; i >= 0; i--) {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sinhala-font-studio-v16-fresh';
+const CACHE_NAME = 'sinhala-font-studio-v17-flow';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
