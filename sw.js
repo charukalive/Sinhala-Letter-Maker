@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sinhala-font-studio-v4';
+const CACHE_NAME = 'sinhala-font-studio-v5-fonts';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -13,7 +13,11 @@ const ASSETS_TO_CACHE = [
   './js/app.js',
   './manifest.json',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  './fonts/4u-Bindumathi.woff2',
+  './fonts/FM-Malithi.woff2',
+  './fonts/FM-Abhaya.woff2',
+  './fonts/IsiAbhaya.woff2'
 ];
 
 self.addEventListener('install', (event) => {
