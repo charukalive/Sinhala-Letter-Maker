@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sinhala-font-studio-v11-pagebreak';
+const CACHE_NAME = 'sinhala-font-studio-v12-netfirst';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -54,6 +54,20 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Page loads: network first, so app updates appear immediately
+  // (cache is only the offline fallback).
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       return cachedResponse || fetch(event.request);
