@@ -68,7 +68,7 @@
   // (16th October 2026 Letter to Min of Environment .docx), in the
   // letter's 2-column grid order. Org line is the same for all.
   const AWC_ORG_LINE = 'සත්ව සුබසාධන සංසදය';
-  const SIGNATORIES = [
+  let SIGNATORIES = [
     { id: 'gihan', nameSi: 'ගිහාන් දිනුෂ්ක', nameEn: 'Gihan Dinushka', img: 'assets/signatures/gihan-dinushka.jpg', w: 389, h: 194 },
     { id: 'chamith', nameSi: 'වෛද්‍ය චමිත් නානායක්කාර', nameEn: 'Dr Chamith Nanayakkara', img: 'assets/signatures/chamith-nanayakkara.jpg', w: 246, h: 204 },
     { id: 'thilini', nameSi: 'තිලිනි ගමගේ', nameEn: 'Thilini Gamage', img: 'assets/signatures/thilini-gamage.jpg', w: 602, h: 261 },
@@ -79,6 +79,32 @@
 
   // Annexure images added by the user: { name, dataUrl, ext, w, h }
   let annexures = [];
+
+  // Letter formatting state (Letter Studio)
+  const selLetterSize = document.getElementById('selLetterSize');
+  const btnCopyLetter = document.getElementById('btnCopyLetter');
+  const newSigNameSi = document.getElementById('newSigNameSi');
+  const newSigNameEn = document.getElementById('newSigNameEn');
+  const newSigFile = document.getElementById('newSigFile');
+  const btnAddSig = document.getElementById('btnAddSig');
+  let letterAlign = 'both'; // 'both' | 'left' | 'center' | 'right'
+  let letterSizePt = 12;
+
+  // Custom signatures are stored on this device only (localStorage)
+  function loadCustomSignatures() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('awc_custom_signatures') || '[]');
+      if (Array.isArray(saved)) {
+        saved.forEach(s => { if (s && s.img && s.nameSi) SIGNATORIES.push(s); });
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function saveCustomSignatures() {
+    try {
+      localStorage.setItem('awc_custom_signatures', JSON.stringify(SIGNATORIES.filter(s => s.custom)));
+    } catch (e) { /* storage full/blocked: signature still works this session */ }
+  }
 
   // Theme & Modal
   const btnThemeToggle = document.getElementById('btnThemeToggle');
@@ -365,9 +391,20 @@
       <label class="sig-check-item">
         <input type="checkbox" id="sigChk-${s.id}" checked>
         <span>${escapeHtml(s.nameEn)}</span>
+        ${s.custom ? `<button class="sig-remove" data-remove-sig="${s.id}" title="Remove this signature">✕</button>` : ''}
       </label>`).join('');
     SIGNATORIES.forEach(s => {
       document.getElementById('sigChk-' + s.id).addEventListener('change', updateLetterEnding);
+    });
+    sigCheckboxes.querySelectorAll('[data-remove-sig]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        SIGNATORIES = SIGNATORIES.filter(s => s.id !== btn.dataset.removeSig);
+        saveCustomSignatures();
+        renderSigCheckboxes();
+        updateLetterEnding();
+        showToast('Signature removed');
+      });
     });
   }
 
@@ -388,6 +425,76 @@
         updateLetterEnding();
       });
     });
+  }
+
+  // --- Doc-editor style formatting for the letter body ---
+  // The A4 letter body is contenteditable: Bold/Italic/Underline apply
+  // to the current selection, alignment and size apply to the letter.
+  function applyInlineFormat(command) {
+    letterBodyRendered.focus();
+    document.execCommand(command, false, null);
+  }
+
+  function setLetterAlign(align) {
+    letterAlign = align;
+    letterBodyRendered.style.textAlign = align === 'both' ? 'justify' : align;
+  }
+
+  // Extract the (possibly formatted) letter body as lines of segments
+  // for the DOCX builder. Preview spans already hold legacy-font text;
+  // any raw Unicode Sinhala (e.g. pasted in) is converted here.
+  function extractRichLines() {
+    const fontChoice = selLetterFont.value;
+    const isIsi = (fontChoice === 'IsiAbhaya');
+    const convertFn = fontChoice === 'unicode' ? null : (isIsi ? unicodeToIsi : unicodeToFM);
+    const lines = [];
+    let cur = [];
+    const flush = () => { lines.push(cur); cur = []; };
+    function walk(node, flags, isRoot) {
+      node.childNodes.forEach(ch => {
+        if (ch.nodeType === 3) {
+          let text = ch.nodeValue;
+          if (!text) return;
+          if (!flags.latin && convertFn && /[\u0D80-\u0DFF]/.test(text)) {
+            text = convertFn(text);
+          }
+          cur.push({ text, bold: !!flags.bold, italic: !!flags.italic, underline: !!flags.underline, latin: !!flags.latin });
+        } else if (ch.nodeType === 1) {
+          const tag = ch.tagName;
+          if (tag === 'BR') { flush(); return; }
+          const f = { ...flags };
+          if (tag === 'B' || tag === 'STRONG') f.bold = true;
+          if (tag === 'I' || tag === 'EM') f.italic = true;
+          if (tag === 'U') f.underline = true;
+          if (ch.classList && ch.classList.contains('en-text')) f.latin = true;
+          if (ch.classList && ch.classList.contains('si-text')) f.latin = false;
+          const isBlock = (tag === 'DIV' || tag === 'P') && !isRoot;
+          if (isBlock && cur.length) flush();
+          walk(ch, f, false);
+          if (isBlock && cur.length) flush();
+        }
+      });
+    }
+    walk(letterBodyRendered, { bold: false, italic: false, underline: false, latin: false }, true);
+    flush();
+    return lines;
+  }
+
+  // Copy the whole letter (body + signatures + copies) with formatting
+  async function copyLetterFormatted() {
+    const assetBase = location.href.replace(/[^/]*$/, '');
+    const html = `<div style="font-family: '${getSelectedFont(true)}', Arial, sans-serif; font-size: 12pt;">` +
+      printableA4Page.innerHTML.replace(/src="assets\//g, `src="${assetBase}assets/`) + '</div>';
+    try {
+      const item = new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([inputText.value || ''], { type: 'text/plain' })
+      });
+      await navigator.clipboard.write([item]);
+      showToast('Letter copied with formatting — paste into Word!', '✨');
+    } catch (e) {
+      showToast('Copy failed in this browser', '⚠️');
+    }
   }
 
   // Letterhead Design Presets
@@ -516,8 +623,14 @@
       targetFont,
       preserveEnglish: chkPreserveEnglish.checked,
       convertSinhalaFn: convertFn,
-      fontSizePt: 12
+      fontSizePt: includeLetterhead ? letterSizePt : 12
     };
+
+    // Letter Studio: export the formatted body (bold/underline/etc.)
+    if (includeLetterhead) {
+      options.richLines = extractRichLines();
+      options.bodyAlign = letterAlign;
+    }
 
     const useLetterheadImage = includeLetterhead && selLetterhead.value === 'awc';
     if (useLetterheadImage) {
@@ -538,8 +651,8 @@
       if (sigs.length) {
         try {
           options.signatures = await Promise.all(sigs.map(async s => ({
-            data: await fetchBytes(s.img),
-            ext: s.img.split('.').pop().toLowerCase(),
+            data: s.img.startsWith('data:') ? dataUrlToBytes(s.img) : await fetchBytes(s.img),
+            ext: s.img.startsWith('data:') ? (s.ext || 'png') : s.img.split('.').pop().toLowerCase(),
             w: s.w, h: s.h,
             org: AWC_ORG_LINE,
             name: s.nameSi
@@ -704,8 +817,34 @@
     showToast(`Downloaded Word (.DOC, 12pt, Justified) with ${fontName}!`);
   }
 
+  // Build an @font-face rule with the selected legacy font embedded as
+  // base64, so Print / Save-as-PDF embeds the font in the PDF itself
+  // (the letter then renders correctly on any computer).
+  const embeddedFontCssCache = {};
+  async function buildEmbeddedFontCss(fontName) {
+    const families = ['4u-Bindumathi', 'FM-Malithi', 'FM-Abhaya', 'IsiAbhaya'];
+    if (!families.includes(fontName)) return '';
+    if (embeddedFontCssCache[fontName]) return embeddedFontCssCache[fontName];
+    try {
+      const buf = await (await fetch(`fonts/${fontName}.woff2`)).arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let bin = '';
+      const CHUNK = 0x8000;
+      for (let i = 0; i < bytes.length; i += CHUNK) {
+        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+      }
+      const b64 = btoa(bin);
+      const css = `@font-face { font-family: '${fontName}'; src: url(data:font/woff2;base64,${b64}) format('woff2'); }`;
+      embeddedFontCssCache[fontName] = css;
+      return css;
+    } catch (e) {
+      return '';
+    }
+  }
+
   // Print Document (Direct A4 Print Layout)
-  function printDocument(isLetterStudio = false) {
+  async function printDocument(isLetterStudio = false) {
+    const printWindow = window.open('', '_blank');
     const printableElement = isLetterStudio ? printableA4Page : null;
     const fontName = getSelectedFont(isLetterStudio);
     const withLetterhead = isLetterStudio && selLetterhead.value === 'awc';
@@ -724,12 +863,13 @@
     `;
     }
 
-    const printWindow = window.open('', '_blank');
+    const fontFaceCss = await buildEmbeddedFontCss(fontName);
     printWindow.document.write(`
       <html>
         <head>
           <title>Formal Letter Print</title>
           <style>
+            ${fontFaceCss}
             @page { size: A4; margin: ${isLetterStudio ? '0' : '1.5cm'}; }
             body { font-family: '${fontName}', sans-serif; padding: 0; margin: 0; background: #fff; color: #000; text-align: justify; text-justify: inter-word; }
             .en-text { font-family: Arial, Helvetica, sans-serif !important; font-weight: normal; }
@@ -741,7 +881,7 @@
             .letter-header-banner { text-align: center; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 25px; }
             .letter-logo-title { font-family: Arial, sans-serif; font-size: 16pt; font-weight: bold; }
             .letter-logo-subtitle { font-family: Arial, sans-serif; font-size: 9pt; color: #555; }
-            .letter-body-content { font-size: 12pt; line-height: 1.6; font-family: '${fontName}', sans-serif; text-align: justify; text-justify: inter-word; }
+            .letter-body-content { font-size: ${isLetterStudio ? letterSizePt : 12}pt; line-height: 1.6; font-family: '${fontName}', sans-serif; text-align: justify; text-justify: inter-word; }
             .letter-footer-banner { border-top: 2px solid #999; margin-top: 40px; padding-top: 10px; font-family: Arial, sans-serif; font-size: 9pt; display: flex; justify-content: space-between; }
             .letter-signatures { margin-top: 10mm; }
             .sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm 14mm; }
@@ -924,6 +1064,66 @@
 
   selLetterhead.addEventListener('change', updateLetterheadDesign);
 
+  // Formatting toolbar: keep the letter selection when clicking buttons
+  document.querySelectorAll('#formatToolbar [data-fmt]').forEach(btn => {
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', () => applyInlineFormat(btn.dataset.fmt));
+  });
+  document.querySelectorAll('#formatToolbar [data-align]').forEach(btn => {
+    btn.addEventListener('click', () => setLetterAlign(btn.dataset.align === 'justify' ? 'both' : btn.dataset.align));
+  });
+  selLetterSize.addEventListener('change', () => {
+    letterSizePt = parseInt(selLetterSize.value, 10) || 12;
+    letterBodyRendered.style.fontSize = letterSizePt + 'pt';
+  });
+  btnCopyLetter.addEventListener('click', copyLetterFormatted);
+
+  // Paste: allow formatted paste into the letter, then strip foreign
+  // fonts/colours so the letter keeps its own font and size.
+  letterBodyRendered.addEventListener('paste', () => {
+    setTimeout(() => {
+      letterBodyRendered.querySelectorAll('*').forEach(el => {
+        el.removeAttribute('style');
+        el.removeAttribute('color');
+        el.removeAttribute('face');
+      });
+    }, 0);
+  });
+
+  // Add your own signature (saved on this device)
+  btnAddSig.addEventListener('click', () => {
+    const nameSi = newSigNameSi.value.trim();
+    const nameEn = newSigNameEn.value.trim() || nameSi;
+    const file = newSigFile.files && newSigFile.files[0];
+    if (!nameSi) { showToast('Enter the name in Sinhala', '⚠️'); return; }
+    if (!file) { showToast('Choose a signature image', '⚠️'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        SIGNATORIES.push({
+          id: 'custom-' + Date.now(),
+          nameSi,
+          nameEn,
+          img: reader.result,
+          ext: (file.type.includes('png') ? 'png' : 'jpg'),
+          w: img.naturalWidth,
+          h: img.naturalHeight,
+          custom: true
+        });
+        saveCustomSignatures();
+        renderSigCheckboxes();
+        updateLetterEnding();
+        newSigNameSi.value = '';
+        newSigNameEn.value = '';
+        newSigFile.value = '';
+        showToast('Signature added!', '✍️');
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
   copiesText.addEventListener('input', updateLetterEnding);
 
   annexInput.addEventListener('change', () => {
@@ -1012,6 +1212,7 @@
   previewFontLabel.textContent = savedFont;
 
   setMode('u2fm'); // Default mode: Unicode -> 4u / FM
+  loadCustomSignatures();
   renderSigCheckboxes();
   renderAnnexList();
   updateLetterheadDesign();

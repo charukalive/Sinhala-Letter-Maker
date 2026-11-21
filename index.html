@@ -243,11 +243,44 @@
         </div>
       </div>
 
+      <!-- Formatting Toolbar (doc-editor style) -->
+      <div class="format-toolbar" id="formatToolbar">
+        <span class="format-label">Format:</span>
+        <button class="fmt-btn" data-fmt="bold" title="Bold (select text in the letter first)"><b>B</b></button>
+        <button class="fmt-btn" data-fmt="italic" title="Italic"><i>I</i></button>
+        <button class="fmt-btn" data-fmt="underline" title="Underline"><u>U</u></button>
+        <span class="fmt-sep"></span>
+        <button class="fmt-btn fmt-wide" data-align="left">Left</button>
+        <button class="fmt-btn fmt-wide" data-align="center">Center</button>
+        <button class="fmt-btn fmt-wide" data-align="right">Right</button>
+        <button class="fmt-btn fmt-wide" data-align="justify">Justify</button>
+        <span class="fmt-sep"></span>
+        <label class="format-size-label">Size:
+          <select id="selLetterSize" class="control-select">
+            <option value="11">11 pt</option>
+            <option value="12" selected>12 pt</option>
+            <option value="13">13 pt</option>
+            <option value="14">14 pt</option>
+          </select>
+        </label>
+        <span class="fmt-sep"></span>
+        <button class="fmt-btn fmt-wide" id="btnCopyLetter">📋 Copy Letter (formatted)</button>
+        <span class="format-hint">Select text in the letter below, then format it. You can also paste formatted text straight into the letter. 🔒 The AWC letterhead is locked as page 1.</span>
+      </div>
+
       <!-- Letter Ending: Signatures / Copies / Annexures -->
       <div class="letter-ending-panel">
         <div class="ending-group">
           <div class="ending-title">✍️ Signatures (අත්සන්)</div>
           <div class="sig-check-grid" id="sigCheckboxes"></div>
+          <div class="add-sig-box">
+            <div class="add-sig-title">➕ Add your own signature</div>
+            <input type="text" id="newSigNameSi" class="ending-input" placeholder="Name in Sinhala (e.g. නම)">
+            <input type="text" id="newSigNameEn" class="ending-input" placeholder="Name in English (label)">
+            <input type="file" id="newSigFile" accept="image/*" class="ending-file">
+            <button class="btn-tool" id="btnAddSig" type="button">Add Signature</button>
+            <div class="add-sig-note">Saved on this device only. Best: a clear photo/scan of the signature on white paper.</div>
+          </div>
         </div>
         <div class="ending-group">
           <div class="ending-title">📋 Copies (පිටපත්)</div>
@@ -274,8 +307,8 @@
             <div class="letter-logo-subtitle" id="letterHeadSub">ANIMAL PROTECTION, REHABILITATION & ADVOCACY</div>
           </div>
 
-          <!-- Letter Body Content Area -->
-          <div class="letter-body-content" id="letterBodyRendered">
+          <!-- Letter Body Content Area (editable: formatting + paste) -->
+          <div class="letter-body-content" id="letterBodyRendered" contenteditable="true" spellcheck="false">
             <!-- Dynamic Content Injected Here -->
           </div>
 

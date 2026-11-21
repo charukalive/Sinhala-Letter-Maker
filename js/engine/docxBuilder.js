@@ -136,6 +136,8 @@
       footerContact = '',
       convertSinhalaFn = null,
       fontSizePt = 12,
+      richLines = null,
+      bodyAlign = 'both',
       letterheadImage = null,
       signatures = [],
       copies = [],
@@ -234,7 +236,7 @@
 
     function letterheadAnchorXml(relId) {
       const id = picIdCounter++;
-      return `<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr><w:r><w:drawing><wp:anchor distT="0" distB="0" distL="114300" distR="114300" simplePos="0" relativeHeight="251658242" behindDoc="1" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>-41275</wp:posOffset></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>-41275</wp:posOffset></wp:positionV><wp:extent cx="7550150" cy="10512410"/><wp:effectExtent l="0" t="0" r="0" b="3810"/><wp:wrapNone/><wp:docPr id="${id}" name="Letterhead"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="Letterhead"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${relId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="7550150" cy="10512410"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r></w:p>`;
+      return `<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr><w:r><w:drawing><wp:anchor distT="0" distB="0" distL="114300" distR="114300" simplePos="0" relativeHeight="251658242" behindDoc="1" locked="1" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>-41275</wp:posOffset></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>-41275</wp:posOffset></wp:positionV><wp:extent cx="7550150" cy="10512410"/><wp:effectExtent l="0" t="0" r="0" b="3810"/><wp:wrapNone/><wp:docPr id="${id}" name="Letterhead"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="Letterhead"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${relId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="7550150" cy="10512410"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r></w:p>`;
     }
 
     // Runs for a short line (signatory names, copies, headings), using the
@@ -294,9 +296,27 @@
       }
     }
 
-    // Process lines
-    const lines = (rawText || '').split(/\r?\n/);
+    // Process lines: formatted (rich) lines from the Letter Studio, or
+    // plain raw text lines when no rich content is supplied.
     const latinTokenRegex = /([A-Za-z0-9/&._-]*[A-Za-z][A-Za-z0-9/&._-]*(?:\s+[-–—]\s+[A-Za-z0-9/&._-]+|\s+[A-Za-z0-9/&._-]*[A-Za-z][A-Za-z0-9/&._-]*)*|[*•▪●○■◆◇►▸@#$%^&+=<>~_|\\\[\]{}]+)/g;
+    if (richLines) {
+      const jc = ['left', 'center', 'right', 'both'].includes(bodyAlign) ? bodyAlign : 'both';
+      for (const segs of richLines) {
+        if (!segs || !segs.length || !segs.some(s => (s.text || '').length)) {
+          bodyXml += `<w:p><w:pPr><w:jc w:val="${jc}"/><w:spacing w:line="240" w:lineRule="auto" w:before="0" w:after="0"/></w:pPr></w:p>`;
+          continue;
+        }
+        bodyXml += `<w:p><w:pPr><w:jc w:val="${jc}"/><w:spacing w:line="240" w:lineRule="auto" w:before="0" w:after="0"/></w:pPr>`;
+        for (const s of segs) {
+          if (!s.text) continue;
+          const font = s.latin ? 'Arial' : targetFont;
+          const fmt = `${s.bold ? '<w:b/>' : ''}${s.italic ? '<w:i/>' : ''}${s.underline ? '<w:u w:val="single"/>' : ''}`;
+          bodyXml += `<w:r><w:rPr><w:rFonts w:ascii="${escapeXml(font)}" w:hAnsi="${escapeXml(font)}" w:cs="${escapeXml(font)}"/>${fmt}<w:sz w:val="${szVal}"/><w:szCs w:val="${szVal}"/></w:rPr><w:t xml:space="preserve">${escapeXml(s.text)}</w:t></w:r>`;
+        }
+        bodyXml += '</w:p>';
+      }
+    } else {
+    const lines = (rawText || '').split(/\r?\n/);
 
     for (const line of lines) {
       // Space after paragraph removed: w:before="0" w:after="0", Justified: w:jc w:val="both"
@@ -335,6 +355,7 @@
       }
 
       bodyXml += '</w:p>';
+    }
     }
 
     // Signatures grid (2 columns): signature image, dotted line, org, name
