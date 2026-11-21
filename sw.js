@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sinhala-font-studio-v10-annexindex';
+const CACHE_NAME = 'sinhala-font-studio-v11-pagebreak';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

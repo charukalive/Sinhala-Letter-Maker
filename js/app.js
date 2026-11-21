@@ -473,6 +473,44 @@
     document.execCommand(command, false, null);
   }
 
+  // Insert a manual page break at the cursor: everything after it
+  // starts on the next page in the Exact Preview, Print/PDF and DOCX.
+  const btnPageBreak = document.getElementById('btnPageBreak');
+  btnPageBreak.addEventListener('click', () => {
+    const marker = document.createElement('div');
+    marker.className = 'page-break-marker';
+    marker.contentEditable = 'false';
+    marker.textContent = '⤓ PAGE BREAK — NEXT PAGE STARTS HERE';
+    letterBodyRendered.focus();
+    const sel = window.getSelection();
+    if (sel.rangeCount && letterBodyRendered.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+      const range = sel.getRangeAt(0);
+      range.deleteContents();
+      const br1 = document.createElement('br');
+      range.insertNode(br1);
+      range.setStartAfter(br1);
+      range.collapse(true);
+      range.insertNode(marker);
+      range.setStartAfter(marker);
+      range.collapse(true);
+      const br2 = document.createElement('br');
+      range.insertNode(br2);
+      range.setStartAfter(br2);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } else {
+      letterBodyRendered.appendChild(document.createElement('br'));
+      letterBodyRendered.appendChild(marker);
+      letterBodyRendered.appendChild(document.createElement('br'));
+    }
+    if (previewView === 'exact') buildExactPreview();
+    showToast('Page break added — content after it starts a new page', '⤓');
+  });
+  letterBodyRendered.addEventListener('input', () => {
+    if (previewView === 'exact') buildExactPreview();
+  });
+
   function setLetterAlign(align) {
     letterAlign = align;
     letterBodyRendered.style.textAlign = align === 'both' ? 'justify' : align;
@@ -498,10 +536,20 @@
           if (!flags.latin && convertFn && /[\u0D80-\u0DFF]/.test(text)) {
             text = convertFn(text);
           }
-          cur.push({ text, bold: !!flags.bold, italic: !!flags.italic, underline: !!flags.underline, latin: !!flags.latin });
+          // Bullet / symbol-only segments (* • ● ▪ etc.) always use
+          // the English font, never the legacy Sinhala font.
+          const segLatin = !!flags.latin || (!/[\u0D80-\u0DFF]/.test(text) && /[*•▪●○■◆◇►▸]/.test(text));
+          cur.push({ text, bold: !!flags.bold, italic: !!flags.italic, underline: !!flags.underline, latin: segLatin });
         } else if (ch.nodeType === 1) {
           const tag = ch.tagName;
           if (tag === 'BR') { flush(); return; }
+          if (ch.classList && ch.classList.contains('page-break-marker')) {
+            flush();
+            const pb = [];
+            pb.pageBreak = true;
+            lines.push(pb);
+            return;
+          }
           const f = { ...flags };
           if (tag === 'B' || tag === 'STRONG') f.bold = true;
           if (tag === 'I' || tag === 'EM') f.italic = true;
@@ -526,7 +574,7 @@
   // on-screen Exact Preview and the Print/PDF output, so what the
   // user sees is exactly what prints: page 1 content can never run
   // underneath the letterhead footer.
-  const SHEET = { w: 794, h: 1123, padX: 76, firstTop: 218, firstBottom: 1005, top: 70, bottom: 1053 };
+  const SHEET = { w: 794, h: 1123, padX: 76, firstTop: 218, firstBottom: 950, top: 70, bottom: 1036 };
   let sheetMeasurer = null;
 
   function collectLineHtml(el) {
@@ -560,23 +608,29 @@
     const addLines = (el) => {
       if (!el || !el.innerHTML.trim()) return;
       collectLineHtml(el).forEach(html => {
+        if (html.includes('page-break-marker')) {
+          units.push({ html: '', h: 0, kind: 'break', break: true });
+          return;
+        }
         const wrapped = `<div class="sheet-line">${html || '&nbsp;'}</div>`;
-        units.push({ html: wrapped, h: html ? measureSheetHtml(wrapped) : lineH, kind: 'line' });
+        units.push({ html: wrapped, h: html ? Math.ceil(measureSheetHtml(wrapped)) + 1 : lineH, kind: 'line' });
       });
     };
     addLines(letterBodyRendered);
     if (letterSignatures.innerHTML.trim()) {
       const html = `<div class="sheet-block">${letterSignatures.innerHTML}</div>`;
-      units.push({ html, h: measureSheetHtml(html) + 10, kind: 'block' });
+      units.push({ html, h: Math.ceil(measureSheetHtml(html)) + 14, kind: 'block' });
     }
     if (letterCopies.innerHTML.trim()) {
+      units.push({ html: '<div style="height:16px"></div>', h: 16, kind: 'spacer' });
       Array.from(letterCopies.children).forEach(ch => {
-        units.push({ html: ch.outerHTML, h: measureSheetHtml(ch.outerHTML), kind: 'line' });
+        units.push({ html: ch.outerHTML, h: Math.ceil(measureSheetHtml(ch.outerHTML)) + 1, kind: 'line' });
       });
     }
     if (letterAnnexIndex.innerHTML.trim()) {
+      units.push({ html: '<div style="height:16px"></div>', h: 16, kind: 'spacer' });
       Array.from(letterAnnexIndex.children).forEach(ch => {
-        units.push({ html: ch.outerHTML, h: measureSheetHtml(ch.outerHTML), kind: 'line' });
+        units.push({ html: ch.outerHTML, h: Math.ceil(measureSheetHtml(ch.outerHTML)) + 1, kind: 'line' });
       });
     }
     addLines(letterTrailing);
@@ -593,6 +647,10 @@
     };
     newSheet();
     for (const u of units) {
+      if (u.break) {
+        if (cur.units.length) newSheet();
+        continue;
+      }
       if (cur.units.length && cur.used + u.h > cur.avail) newSheet();
       cur.units.push(u);
       cur.used += u.h;
@@ -1059,6 +1117,7 @@
             .sheet-content { position: absolute; left: 20mm; right: 20mm; line-height: 1.6; word-break: break-word; }
             .sheet-line { line-height: 1.6; min-height: 1.6em; }
             .sheet-block { margin-top: 3mm; }
+            .page-break-marker { page-break-after: always; break-after: page; height: 0; overflow: hidden; visibility: hidden; }
             .print-wrap { position: relative; padding: 18mm 20mm; box-sizing: border-box; }
             .print-wrap.with-letterhead { padding: 54mm 20mm 24mm 20mm; }
             .letterhead-bg { display: none; }
@@ -1091,7 +1150,20 @@
     `);
     printWindow.document.close();
     printWindow.focus();
-    setTimeout(() => printWindow.print(), 400);
+    // Wait for the embedded font so line breaks match the preview
+    // measurement before the print dialog opens.
+    let printed = false;
+    const doPrint = () => {
+      if (printed) return;
+      printed = true;
+      setTimeout(() => printWindow.print(), 60);
+    };
+    if (printWindow.document.fonts && printWindow.document.fonts.ready) {
+      printWindow.document.fonts.ready.then(doPrint);
+      setTimeout(doPrint, 1500);
+    } else {
+      setTimeout(doPrint, 400);
+    }
   }
 
   function escapeHtml(str) {

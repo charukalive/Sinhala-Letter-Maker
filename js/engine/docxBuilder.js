@@ -305,6 +305,10 @@
       const jc = ['left', 'center', 'right', 'both'].includes(bodyAlign) ? bodyAlign : 'both';
       let out = '';
       for (const segs of linesArr) {
+        if (segs && segs.pageBreak) {
+          out += '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+          continue;
+        }
         if (!segs || !segs.length || !segs.some(s => (s.text || '').length)) {
           out += `<w:p><w:pPr><w:jc w:val="${jc}"/><w:spacing w:line="240" w:lineRule="auto" w:before="0" w:after="0"/></w:pPr></w:p>`;
           continue;
